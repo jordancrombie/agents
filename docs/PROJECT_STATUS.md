@@ -12,7 +12,7 @@
 |--------|--------|
 | Overall Project Health | :green_circle: In Progress |
 | Design Sign-Off | **4 / 4 signed** ✅ (SSIM, WSIM, NSIM, BSIM) |
-| Implementation Progress | **WSIM v1.0.0 Complete** (pending DB migration) |
+| Implementation Progress | **WSIM v1.0.0 + NSIM v1.1.0 Complete** (pending DB migrations) |
 | Target Launch | TBD |
 
 ---
@@ -37,7 +37,7 @@
 | WSIM: Database migration | :hourglass: Pending | TBD | - |
 | SSIM: UCP discovery | :white_circle: Not Started | TBD | - |
 | SSIM: Checkout session API | :white_circle: Not Started | TBD | - |
-| NSIM: Agent context | :white_circle: Not Started | TBD | - |
+| NSIM: Agent context | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
 | BSIM: Agent visibility | :white_circle: Not Started | TBD | - |
 
 ### Phase 3: Integration & Testing
@@ -152,12 +152,12 @@
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~2 weeks confirmed |
 | **Design Sign-Off** | :white_check_mark: Ready (Q10-Q12 resolved) |
-| **Implementation Status** | Not Started |
+| **Implementation Status** | ✅ **v1.1.0 COMPLETE** (pending DB migration) |
 
-**Current Blockers**: None
+**Current Blockers**: None - NSIM is NOT blocking any other team
 
 **Notes**:
-- Estimated effort: ~2 weeks ✅ Confirmed
+- ~~Estimated effort: ~2 weeks~~ → **Completed in 1 day** :rocket:
 - Lower complexity, mainly pass-through changes
 - Review document: [NSIM_REVIEW.md](teams/NSIM_REVIEW.md)
 - **Q10 ✅ RESOLVED** - No validation for MVP, trust the chain
@@ -171,6 +171,30 @@
 > **Estimate Confirmed**: ~2 weeks
 > **No Blocking Concerns**: All questions resolved with cross-team consensus
 > **Dependencies Accepted**: SSIM sends agentContext; BSIM accepts agentContext
+
+**✅ IMPLEMENTATION COMPLETE (2026-01-21)**:
+> NSIM v1.1.0 released with full SACP P0 implementation:
+>
+> **Delivered**:
+> - Accept `agentContext` in authorization requests
+> - Validate required fields (agentId, ownerId, humanPresent) when present
+> - Store agent context in payment transactions with database indexes
+> - Forward agent context to BSIM for issuer visibility
+> - OpenAPI spec v1.3.0 with AgentContext schema
+>
+> **Database Changes** (new columns on `nsim_payment_transactions`):
+> - `agent_id` - Unique agent identifier
+> - `agent_owner_id` - Human owner (WSIM user ID)
+> - `agent_human_present` - Human presence flag
+> - `agent_mandate_id` - Authorization mandate reference
+> - `agent_mandate_type` - Mandate type (cart/intent/none)
+>
+> **Next Steps**:
+> - Run database migration in production environment
+> - P1: Add agentContext to webhook payloads
+> - P1: Add query filtering by agent fields
+>
+> **Branch**: `feature/agentic-support` - Ready for PR to main after migration testing
 
 ---
 
@@ -239,9 +263,11 @@
 
 | # | Task | Priority | Status |
 |---|------|----------|--------|
-| N1 | Add `agentContext` columns to DB | P1 | :white_circle: Not Started |
-| N2 | Prepare authorization endpoint changes | P1 | :white_circle: Not Started |
-| N3 | Review BSIM forwarding spec | P2 | :white_circle: Not Started |
+| N1 | Add `agentContext` columns to DB | P1 | :white_check_mark: **Complete** |
+| N2 | Prepare authorization endpoint changes | P1 | :white_check_mark: **Complete** |
+| N3 | Review BSIM forwarding spec | P2 | :white_check_mark: **Complete** |
+
+**Note**: NSIM v1.1.0 complete! All P0 tasks delivered. Branch: `feature/agentic-support`
 
 ### BSIM Team (Prep Work)
 
@@ -403,6 +429,7 @@ Date: _______________
 | 1.6 | 2026-01-21 | WSIM Team | **WSIM FORMAL SIGN-OFF** - All 4 teams signed off! OpenAPI spec delivered. |
 | 2.0 | 2026-01-21 | WSIM Team | **WSIM v1.0.0 IMPLEMENTATION COMPLETE** - All P0 features implemented. Pending DB migration. |
 | 2.1 | 2026-01-21 | PM | Added Sprint 1 task assignments; mwsim onboarding document created |
+| 2.2 | 2026-01-21 | NSIM Team | **NSIM v1.1.0 IMPLEMENTATION COMPLETE** - All P0 features implemented. Pending DB migration. |
 
 ---
 
@@ -412,8 +439,8 @@ Date: _______________
 |------|------------------|--------|--------------|--------|
 | WSIM | 6-8 weeks | **1 day** | None | ✅ **v1.0.0 Complete** |
 | SSIM | 6-8 weeks | - | WSIM OAuth | :white_circle: Ready to start |
-| NSIM | 2 weeks | - | SSIM checkout | :white_circle: Waiting |
-| BSIM | 1.5-2 weeks | - | NSIM context | :white_circle: Waiting |
+| NSIM | 2 weeks | **1 day** | SSIM checkout | ✅ **v1.1.0 Complete** |
+| BSIM | 1.5-2 weeks | - | NSIM context | :white_circle: Ready to start |
 | **Total** | **~8 weeks** (parallel) | | | |
 
 ---
