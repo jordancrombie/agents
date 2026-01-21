@@ -71,17 +71,19 @@
 | **Implementation Status** | Not Started |
 
 **Current Blockers**:
-- Q17: WSIM API contract needed by end of Week 1 (**CRITICAL**)
-- Q18: Token caching policy decision needed
-- Q19: Session isolation confirmation needed
+- Q17: WSIM API contract needed by end of Week 1 (**IN PROGRESS** - WSIM drafting spec)
 
 **Notes**:
 - Original estimate: ~5-6 weeks → **Revised: 6-8 weeks**
 - Review document: [SSIM_REVIEW.md](teams/SSIM_REVIEW.md)
 - 4 original questions responded to (Q1-Q4)
 - 5 new questions raised (Q17-Q21)
+- Q18 (Token caching) ✅ Resolved - 60s TTL approved
+- Q19 (Session isolation) ✅ Resolved - Phase 1 isolation confirmed
+- Q20 (Rate limiting) ✅ Resolved - 1000 req/min baseline
+- Q21 (WSIM unavailability) ✅ Resolved - Retry + cache
 - Recommends moving MCP server from P1 to P2
-- Conditional sign-off pending Q17/Q18/Q19 resolution
+- **Unblocked once WSIM delivers Q17 OpenAPI spec**
 
 ---
 
@@ -93,8 +95,8 @@
 | **Assigned Developers** | [TBD] |
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~6-8 weeks confirmed |
-| **Design Sign-Off** | :hourglass: Awaiting team consensus on Q5-Q9 |
-| **Implementation Status** | Not Started |
+| **Design Sign-Off** | :white_check_mark: Q5-Q9 Resolved |
+| **Implementation Status** | :construction: OpenAPI Spec In Progress |
 
 **Current Blockers**: None
 
@@ -102,8 +104,14 @@
 - Estimated effort: ~6-8 weeks ✅ Confirmed
 - Critical path component - all other teams depend on WSIM
 - Review document: [WSIM_REVIEW.md](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/WSIM_REVIEW.md)
-- 5 questions responded to in PROJECT_QA.md (Q5-Q9)
-- Also responded to Q14 (BSIM ID compatibility), Q17 (OpenAPI spec), Q18 (caching)
+- **Q5-Q9 ✅ RESOLVED** - All WSIM questions now have consensus:
+  - Q5: Secret rotation with re-authorization flow
+  - Q6: 15-minute step-up expiration
+  - Q7: All payment methods, user default, card selection
+  - Q8: EST timezone for MVP, user-configurable Phase 2
+  - Q9: mwsim full agent management required
+- Also confirmed Q14 (BSIM ID compatibility - UUID via BsimEnrollment)
+- **Q17 IN PROGRESS**: Drafting OpenAPI spec (`docs/openapi-agent.yaml`)
 - **NEW**: mwsim requirements drafted - [MWSIM_REQUIREMENTS.md](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/MWSIM_REQUIREMENTS.md)
 - mwsim adds ~3-4 weeks parallel effort for mobile agent management
 
@@ -138,7 +146,7 @@
 | **Assigned Developers** | [TBD] |
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~1.5-2 weeks confirmed |
-| **Design Sign-Off** | :hourglass: Awaiting team consensus on Q13/Q14/Q15 |
+| **Design Sign-Off** | :hourglass: Awaiting team consensus on Q13/Q15 (Q14 resolved) |
 | **Implementation Status** | Not Started |
 
 **Current Blockers**: None
@@ -148,7 +156,7 @@
 - Primarily UI/visibility changes + bank-level policy (P1 minimal)
 - 3 questions responded to in PROJECT_QA.md (Q13, Q14, Q15)
 - Confirmed NSIM Q11 (risk scoring delegation to BSIM)
-- Dependency: Need WSIM confirmation on ownerId format for Q14
+- **Q14 ✅ RESOLVED** - WSIM confirmed ownerId UUID format, maps via BsimEnrollment
 
 ---
 
@@ -169,10 +177,10 @@ Each team must review their requirements document and sign off before implementa
 
 | Team | Reviewer | Date | Status | Comments |
 |------|----------|------|--------|----------|
-| SSIM | SSIM Team | 2026-01-21 | :hourglass: Review Complete | Conditional sign-off pending Q17/Q18/Q19 |
-| WSIM | WSIM Team | 2026-01-21 | :hourglass: Review Complete | Awaiting Q5-Q9 consensus; responded to Q14/Q17/Q18 |
+| SSIM | SSIM Team | 2026-01-21 | :hourglass: Review Complete | Q18-Q21 resolved; awaiting Q17 OpenAPI spec |
+| WSIM | WSIM Team | 2026-01-21 | :white_check_mark: Ready | Q5-Q9 resolved; OpenAPI spec in progress |
 | NSIM | NSIM Team | 2026-01-21 | :hourglass: Review Complete | Awaiting Q10 consensus (Q11/Q12 resolved) |
-| BSIM | BSIM Team | 2026-01-21 | :hourglass: Review Complete | Awaiting Q13/Q14/Q15 consensus |
+| BSIM | BSIM Team | 2026-01-21 | :hourglass: Review Complete | Awaiting Q13/Q15 consensus (Q14 resolved) |
 
 **Sign-Off Format**:
 ```
@@ -248,10 +256,11 @@ Date: _______________
 |----|--------|-------|----------|--------|
 | A1 | Schedule design review meeting | PM | TBD | Open |
 | A2 | Assign team leads for each component | PM | TBD | Open |
-| A3 | Review and respond to open questions | All Teams | TBD | Open |
-| A4 | Confirm effort estimates | Team Leads | TBD | Open |
+| A3 | Review and respond to open questions | All Teams | TBD | ✅ WSIM Complete |
+| A4 | Confirm effort estimates | Team Leads | TBD | ✅ Complete |
 | A5 | Complete design sign-off | Team Leads | TBD | Open |
 | A6 | Create GitHub issues for Phase 1 work | PM | TBD | Open |
+| A7 | Deliver OpenAPI spec for agent endpoints (Q17) | WSIM | Week 1 | :construction: In Progress |
 
 ---
 
@@ -271,6 +280,7 @@ Date: _______________
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-01-21 | Design Team | Initial document |
+| 1.1 | 2026-01-21 | WSIM Team | Q5-Q9 resolved, Q14 confirmed, Q17 in progress |
 
 ---
 

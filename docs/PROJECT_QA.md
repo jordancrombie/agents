@@ -43,18 +43,18 @@ This document tracks questions raised by teams during design review and implemen
 | Q2 | SSIM | Multiple shipping options | ✅ Resolved | Low |
 | Q3 | SSIM | Promo code support for agents | ✅ Resolved | Low |
 | Q4 | SSIM | Partial fulfillment handling | ✅ Resolved | Medium |
-| Q5 | WSIM | Agent secret rotation | PM Input - Awaiting Feedback | Medium |
-| Q6 | WSIM | Step-up expiration time | PM Input - Awaiting Feedback | High |
-| Q7 | WSIM | Multiple payment methods per agent | PM Input - Awaiting Feedback | Medium |
-| Q8 | WSIM | Daily limit timezone handling | PM Input - Awaiting Feedback | Medium |
-| Q9 | WSIM | mwsim agent management | PM Input - Awaiting Feedback | **High** |
+| Q5 | WSIM | Agent secret rotation | ✅ Resolved | Medium |
+| Q6 | WSIM | Step-up expiration time | ✅ Resolved | High |
+| Q7 | WSIM | Multiple payment methods per agent | ✅ Resolved | Medium |
+| Q8 | WSIM | Daily limit timezone handling | ✅ Resolved | Medium |
+| Q9 | WSIM | mwsim agent management | ✅ Resolved | **High** |
 | Q10 | NSIM | Agent context validation | Under Discussion | Medium |
 | Q11 | NSIM | Risk scoring delegation | Under Discussion | Medium |
 | Q12 | NSIM | Agent-specific webhook events | ✅ Resolved | Low |
 | Q13 | BSIM | Agent badge opt-in | Open | Low |
-| Q14 | BSIM | Agent ownership verification | Open | Medium |
+| Q14 | BSIM | Agent ownership verification | ✅ Resolved | Medium |
 | Q15 | BSIM | Agent transaction decline authority | Open | High |
-| Q17 | SSIM | WSIM Mock Service Contract | Open | **Critical** |
+| Q17 | SSIM | WSIM Mock Service Contract | ✅ In Progress | **Critical** |
 | Q18 | SSIM | Token Caching Policy | ✅ Resolved | High |
 | Q19 | SSIM | Agent vs Human Session Interaction | ✅ Resolved | High |
 | Q20 | SSIM | Rate Limiting Requirements | ✅ Resolved | Medium |
@@ -168,7 +168,7 @@ Current flow assumes all items are available. Need to define behavior when some 
 ### Q17: WSIM Mock Service Contract
 **Asked by**: SSIM Team
 **Date**: 2026-01-21
-**Status**: Open
+**Status**: ✅ In Progress
 **Priority**: **CRITICAL - Blocks SSIM Week 2 Start**
 
 **Question**:
@@ -183,10 +183,19 @@ SSIM is scheduled to start Week 2 with "mock WSIM". For this to work, we need ex
 Without this contract, SSIM cannot build mocks and will be blocked.
 
 **Discussion**:
--
+- 2026-01-21 WSIM Team: **COMMITTED. OpenAPI spec in progress.**
+  - Will create `docs/openapi-agent.yaml` in wsim repo
+  - Covers all endpoints needed for SSIM mocks:
+    - `POST /api/agent/v1/oauth/token` - Agent OAuth token
+    - `POST /api/agent/v1/oauth/introspect` - Token validation
+    - `POST /api/agent/v1/payments/token` - Payment token request
+    - Step-up webhook payload format
+  - SSIM can build mocks from this contract
+  - Spec will be available in wsim repo `agentic-support` branch
 
 **Resolution**:
-[Pending - WSIM team response required]
+✅ **IN PROGRESS**: WSIM drafting OpenAPI spec. Will be available in wsim repo for SSIM to use.
+**Target**: End of Week 1
 
 ---
 
@@ -316,7 +325,7 @@ If WSIM goes down mid-checkout, options are:
 ### Q5: Agent secret rotation
 **Asked by**: WSIM Team
 **Date**: 2026-01-21
-**Status**: PM Input Provided - Awaiting Team Feedback
+**Status**: ✅ Resolved
 
 **Question**:
 Should agent client secrets be rotatable without requiring full re-registration?
@@ -334,16 +343,23 @@ Security best practice is to rotate secrets periodically. Need to decide if we s
     1. Detect when delegation has expired
     2. Guide user through re-enrollment/approval
   - This maintains security while avoiding friction of full re-registration
+- 2026-01-21 WSIM Team: **CONFIRMED.** Agreed with PM approach.
+  - Will implement periodic expiry tracking for agent delegations
+  - Support re-authorization flow when delegation expires
+  - Add `POST /api/mobile/agents/:id/rotate-secret` endpoint
+  - Agent will detect expired delegation via 401 response with `delegation_expired` error code
+  - mwsim will handle re-authorization flow in-app
 
 **Resolution**:
-[Awaiting WSIM team feedback on implementation approach]
+✅ **RESOLVED**: Support secret rotation with re-authorization flow. Agent delegations have periodic expiry. WSIM/mwsim guide user through renewal.
+**Resolved by**: PM + WSIM | **Date**: 2026-01-21
 
 ---
 
 ### Q6: Step-up expiration time
 **Asked by**: WSIM Team
 **Date**: 2026-01-21
-**Status**: PM Input Provided - Awaiting Team Feedback
+**Status**: ✅ Resolved
 
 **Question**:
 What should the default step-up request expiration time be?
@@ -355,16 +371,22 @@ Suggesting 15 minutes. Too short = user misses notification. Too long = stale ca
 - 2026-01-21 PM: **15 minutes is fine.**
   - Balances user availability with cart freshness
   - Aligns with WSIM's original suggestion
+- 2026-01-21 WSIM Team: **CONFIRMED.** 15 minutes default.
+  - Push notification should reach user within seconds
+  - 15 minutes gives adequate response time
+  - Cart prices/availability can change - shorter is better
+  - Can be configurable per-merchant in Phase 2 if needed
 
 **Resolution**:
-[Awaiting WSIM team confirmation]
+✅ **RESOLVED**: 15-minute default step-up expiration. Configurable per-merchant in Phase 2.
+**Resolved by**: PM + WSIM | **Date**: 2026-01-21
 
 ---
 
 ### Q7: Multiple payment methods per agent
 **Asked by**: WSIM Team
 **Date**: 2026-01-21
-**Status**: PM Input Provided - Awaiting Team Feedback
+**Status**: ✅ Resolved
 
 **Question**:
 Should agents be able to select from multiple enrolled payment methods, or use a designated default?
@@ -379,16 +401,26 @@ Users may have multiple cards enrolled. Need to decide if agent can choose, or a
   - For auto-approved transactions (within limits): use default
   - For step-up transactions: user can select from available methods during approval
   - This provides flexibility while maintaining user control
+- 2026-01-21 WSIM Team: **CONFIRMED.** Full payment method support.
+  - All payment methods in user's wallet should be accessible to agents
+  - User sets a default payment method for agent auto-approvals
+  - Agent/user can select specific card for any transaction
+  - Use cases:
+    1. Auto-approve: Uses default card
+    2. Step-up: User can select from available cards during approval
+    3. Specific request: Agent can request specific card if user/agent prefers
+  - Implementation: Payment token API accepts optional `paymentMethodId` parameter
 
 **Resolution**:
-[Awaiting WSIM team feedback on implementation approach]
+✅ **RESOLVED**: Support all payment methods. User sets default for auto-approve. Agent/user can select specific card for any transaction.
+**Resolved by**: PM + WSIM | **Date**: 2026-01-21
 
 ---
 
 ### Q8: Daily limit timezone handling
 **Asked by**: WSIM Team
 **Date**: 2026-01-21
-**Status**: PM Input Provided - Awaiting Team Feedback
+**Status**: ✅ Resolved
 
 **Question**:
 How should we handle timezone for daily spending limits?
@@ -402,16 +434,22 @@ Need to define when the "day" resets - user's local timezone, UTC, or wallet ser
   - Simplifies MVP implementation (single timezone)
   - Future consideration: User-configurable timezone in Phase 2
   - Note: EST = UTC-5 (or EDT = UTC-4 during daylight saving)
+- 2026-01-21 WSIM Team: **CONFIRMED.** EST for MVP, user-definable long term.
+  - MVP: Day resets at midnight America/Toronto (EST/EDT)
+  - More user-friendly than UTC (matches local business day for majority of users)
+  - Phase 2: Add user-configurable timezone in wallet settings
+  - Implementation: Store transactions in UTC, calculate daily totals with timezone offset
 
 **Resolution**:
-[Awaiting WSIM team confirmation]
+✅ **RESOLVED**: MVP uses America/Toronto (EST/EDT). Phase 2 adds user-configurable timezone.
+**Resolved by**: PM + WSIM | **Date**: 2026-01-21
 
 ---
 
 ### Q9: mwsim agent management
 **Asked by**: WSIM Team
 **Date**: 2026-01-21
-**Status**: PM Input Provided - Awaiting Team Feedback
+**Status**: ✅ Resolved
 
 **Question**:
 Should mobile wallet (mwsim) users be able to register and manage agents from the mobile app?
@@ -431,9 +469,17 @@ Current design assumes web UI. Mobile support would expand access but increase s
     4. Revoke agents from mobile
   - Feature parity between web (WSIM) and mobile (mwsim) is essential
   - This aligns with WSIM team's drafted MWSIM_REQUIREMENTS.md
+- 2026-01-21 WSIM Team: **CONFIRMED.** Mobile support is critical.
+  - Mobile-first users expect to manage everything from the app
+  - Step-up approval is time-sensitive - in-app approval is faster than web redirect
+  - Push notifications already go to mobile - natural to complete approval there
+  - Full feature list in [MWSIM_REQUIREMENTS.md](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/MWSIM_REQUIREMENTS.md)
+  - **Timeline impact**: Adds ~3-4 weeks parallel mwsim effort
+  - mwsim work can start once WSIM API contracts are defined (Q17)
 
 **Resolution**:
-[Awaiting WSIM/mwsim team confirmation on scope and timeline impact]
+✅ **RESOLVED**: mwsim full agent management required. Feature parity with web. Adds ~3-4 weeks parallel effort.
+**Resolved by**: PM + WSIM | **Date**: 2026-01-21
 
 ---
 
@@ -581,7 +627,7 @@ Some users may not want visual distinction. Others may want clear visibility of 
 ### Q14: Agent ownership verification
 **Asked by**: BSIM Team
 **Date**: 2026-01-21
-**Status**: Under Discussion
+**Status**: ✅ Resolved
 
 **Question**:
 Should BSIM verify that the agent owner ID matches the cardholder?
@@ -609,8 +655,16 @@ Could prevent scenarios where Agent A (owned by User X) uses a card belonging to
 
   **Dependency**: Need WSIM to confirm `ownerId` format matches BSIM's `cardholderId` format, or provide a mapping.
 
+- 2026-01-21 WSIM Team: **CONFIRMED ID format compatibility.**
+  - WSIM `ownerId` is the WSIM user ID (UUID format, e.g., `550e8400-e29b-41d4-a716-446655440000`)
+  - BSIM can map this via the `BsimEnrollment` table which links WSIM user to BSIM cardholder
+  - For verification: BSIM should call WSIM's introspection endpoint which returns `owner_id`
+  - BSIM can then verify `owner_id` maps to the cardholder via enrollment lookup
+  - Introspection response includes: `{ owner_id: "uuid", ... }`
+
 **Resolution**:
-[Awaiting WSIM confirmation on ID format compatibility]
+✅ **RESOLVED**: YES - verify ownership. WSIM ownerId is UUID. BSIM maps via BsimEnrollment table.
+**Resolved by**: BSIM + WSIM | **Date**: 2026-01-21
 
 ---
 
@@ -699,6 +753,13 @@ Bank may want additional controls (e.g., decline all agent transactions above $5
 | 2026-01-21 | Q19: Phase 1 isolation, Phase 2 session sharing | Start simple, design for future | PM |
 | 2026-01-21 | Q20: 1000 req/min per agent, store-configurable | Reasonable baseline with flexibility | PM |
 | 2026-01-21 | Q21: Retry + cache on WSIM unavailability | Graceful degradation with fallback | PM |
+| 2026-01-21 | Q5: Secret rotation with re-authorization flow | Security + convenience balance | PM + WSIM |
+| 2026-01-21 | Q6: 15-minute step-up expiration | User availability vs cart freshness | PM + WSIM |
+| 2026-01-21 | Q7: All payment methods, user default, card selection | Flexibility with user control | PM + WSIM |
+| 2026-01-21 | Q8: EST timezone for MVP, user-configurable in Phase 2 | User-friendly default | PM + WSIM |
+| 2026-01-21 | Q9: mwsim full agent management required | Mobile-first user experience | PM + WSIM |
+| 2026-01-21 | Q14: Verify agent owner via BsimEnrollment mapping | Prevent cross-user abuse | BSIM + WSIM |
+| 2026-01-21 | Q17: WSIM providing OpenAPI spec for SSIM mocks | Unblock SSIM Week 2 start | WSIM |
 
 ---
 
