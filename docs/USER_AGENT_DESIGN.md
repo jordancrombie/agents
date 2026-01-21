@@ -503,7 +503,7 @@ Our approach is more flexible than industry standard (OAuth only) while being mo
 
 **Reviewer**: WSIM Team
 **Date**: 2026-01-21
-**Status**: Conditional Agreement
+**Status**: ✅ AGREEMENT
 
 ### Overall Assessment
 
@@ -645,17 +645,275 @@ If these conditions are accepted, WSIM will:
 
 ---
 
-**Sign-Off Statement** (pending resolution of Q1-Q6):
+**Sign-Off Statement**:
 
 ```
 I, on behalf of the WSIM team, have reviewed the User-Agent Credential Flow
 & Message Center Proposal dated 2026-01-21.
 
-WSIM conditionally agrees to the proposal with the modifications noted above.
-Upon acceptance of these modifications, we commit to updating our OpenAPI spec
-and implementing the required endpoints.
+All WSIM conditions have been accepted by mwsim team:
+✅ Pairing codes for Phase 1 (alias-based deferred to Phase 2)
+✅ 24-hour expiration for access requests
+✅ Limit modification restricted to decreases only
+✅ Client-side Message Center aggregation for Phase 1
+
+WSIM commits to:
+1. Update OpenAPI spec with access-request endpoints
+2. Add AccessRequest and PairingCode models to Prisma schema
+3. Implement pairing code generation and validation
+4. Add agent.access_request notification type
 
 Team: WSIM
 Date: 2026-01-21
-Status: CONDITIONAL AGREEMENT (pending Q1-Q6 resolution)
+Status: ✅ AGREEMENT
 ```
+
+---
+
+## mwsim Team Response
+
+**Reviewer**: mwsim Team
+**Date**: 2026-01-21
+**Status**: Agreement with Discussion on Q1
+
+### Response to WSIM Modifications
+
+mwsim accepts WSIM's modifications with the following notes:
+
+| # | WSIM Modification | mwsim Response |
+|---|-------------------|----------------|
+| Q1 | Pairing codes (not email) | **Partial agree** - See discussion below |
+| Q2 | 24-hour expiration | **Agree** |
+| Q3 | Decrease limits only | **Agree** |
+| Q4 | Multiple agents supported | **Acknowledged** |
+| Q5 | Client-side aggregation Phase 1 | **Agree** |
+| Q6 | 30-day retention | **Agree** |
+| Q7 | New notification type | **Acknowledged** |
+
+### Discussion: Q1 - User Identification
+
+mwsim agrees that email-based identification has security concerns. However, we want to ensure the final solution supports **push-to-authenticate**, not just pairing codes.
+
+**Why push-to-authenticate matters:**
+1. We already have push notification infrastructure
+2. Better UX for users who are already in their agent environment
+3. Pairing codes add friction (copy/paste, expiration management)
+4. Industry trend toward "passwordless" / push-based auth
+
+**Proposed hybrid approach:**
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     USER IDENTIFICATION OPTIONS                      │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Option A: Pairing Code (User-Initiated)                            │
+│  ─────────────────────────────────────────                          │
+│  1. User generates code in mwsim                                    │
+│  2. User gives code to agent                                        │
+│  3. Agent submits code → Push notification → Approve                │
+│                                                                      │
+│  Option B: User Alias (Agent-Initiated)                             │
+│  ─────────────────────────────────────────                          │
+│  1. Agent requests by @alias (already public for transfers)         │
+│  2. WSIM sends push notification to user                            │
+│  3. User approves in mwsim                                          │
+│                                                                      │
+│  Option C: QR Code (In-Person)                                      │
+│  ─────────────────────────────────────────                          │
+│  1. Agent displays QR                                               │
+│  2. User scans with mwsim                                           │
+│  3. User approves in mwsim                                          │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Re: Option B (User Alias)**
+
+User aliases (e.g., `@jordan`) are already semi-public - they're used for P2P transfers and visible to counterparties. Using alias for agent requests:
+
+- **Pros**: No new identifier to manage, natural extension of existing system
+- **Cons**: Enumeration risk (but already exists for transfers)
+
+**Mitigation for alias-based requests:**
+1. **Rate limiting**: Max 3 agent requests per alias per hour
+2. **User controls**: "Allow agent requests" toggle in settings (default: ON)
+3. **Notification-only**: Request doesn't confirm alias exists until user acts
+4. **Blocklist**: Users can block specific agent sources
+
+**mwsim Recommendation:**
+
+| Phase | Primary Flow | Fallback |
+|-------|--------------|----------|
+| Phase 1 | Pairing code | QR code |
+| Phase 2 | Add alias-based with rate limiting | Pairing code |
+
+We can START with pairing codes as WSIM suggests, but the architecture should support alias-based push authentication in Phase 2.
+
+### Implementation Impact
+
+With the agreed modifications, mwsim's implementation plan updates:
+
+**New screen needed**: "Generate Pairing Code"
+```
+Settings > AI Agents > [+] Add Agent > Generate Pairing Code
+```
+
+**Updated flow**:
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│     mwsim       │     │      WSIM       │     │    AI Agent     │
+└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
+         │                       │                       │
+         │ 1. Generate code      │                       │
+         │ ─────────────────────►│                       │
+         │                       │                       │
+         │ 2. WSIM-ABC123-XYZ789 │                       │
+         │ ◄─────────────────────│                       │
+         │                       │                       │
+         │ 3. User gives code    │                       │
+         │   to agent            │ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─►│
+         │                       │                       │
+         │                       │ 4. POST /access-request
+         │                       │    { pairing_code }   │
+         │                       │ ◄─────────────────────│
+         │                       │                       │
+         │ 5. Push notification  │                       │
+         │ ◄─────────────────────│                       │
+         │                       │                       │
+         │ 6. User reviews &     │                       │
+         │    approves           │                       │
+         │ ─────────────────────►│                       │
+         │                       │                       │
+         │                       │ 7. Credentials        │
+         │                       │ ─────────────────────►│
+```
+
+### Sign-Off
+
+```
+mwsim team accepts WSIM's modifications:
+- Pairing codes for Phase 1 (with alias-based push in Phase 2 roadmap)
+- 24-hour expiration for access requests
+- Limit modification restricted to decreases
+- Client-side Message Center aggregation for Phase 1
+
+Team: mwsim
+Date: 2026-01-21
+Status: AGREEMENT
+```
+
+---
+
+## Architectural Clarification: Binding vs Authorization
+
+**Important distinction** raised during review:
+
+### 1. Initial Binding (One-Time Setup)
+
+How the agent first connects to a user's wallet and receives credentials.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      INITIAL BINDING OPTIONS                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Phase 1:                                                           │
+│  ┌──────────────────┐  ┌──────────────────┐                        │
+│  │  Pairing Code    │  │    QR Scan       │                        │
+│  │  User generates  │  │  Agent displays  │                        │
+│  │  code, gives to  │  │  QR, user scans  │                        │
+│  │  agent           │  │  with mwsim      │                        │
+│  └──────────────────┘  └──────────────────┘                        │
+│                                                                      │
+│  Phase 2 (Future):                                                  │
+│  ┌──────────────────┐                                              │
+│  │  Alias-based     │                                              │
+│  │  Agent requests  │                                              │
+│  │  by @alias       │                                              │
+│  └──────────────────┘                                              │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Result**: Agent receives `client_id` + `client_secret` for OAuth token requests.
+
+### 2. Follow-on Authorization (Ongoing)
+
+After initial binding, how the agent requests approvals for actions (step-ups, limit increases, etc.)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    FOLLOW-ON AUTHORIZATION                           │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  All Phases:                                                        │
+│  ┌──────────────────┐  ┌──────────────────┐                        │
+│  │ Push Notification│  │  Message Center  │                        │
+│  │ (Mobile)         │  │  (Web Wallet)    │                        │
+│  │                  │  │                  │                        │
+│  │ • Step-up        │  │ • Step-up        │                        │
+│  │ • Limit warning  │  │ • Limit warning  │                        │
+│  │ • Transactions   │  │ • Transactions   │                        │
+│  └──────────────────┘  └──────────────────┘                        │
+│                                                                      │
+│  Agent already has credentials - just needs approval for actions    │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Summary
+
+| Concern | Method | When |
+|---------|--------|------|
+| **Who is this agent connecting to?** | Pairing code, QR, (future: alias) | Initial binding only |
+| **Can this agent do X?** | Push notification, Message Center | Every step-up/authorization |
+
+This separation means:
+- Initial binding methods can evolve independently
+- Authorization UX is consistent regardless of how agent was bound
+- Web wallet users get Message Center, mobile users get push + Message Center
+
+---
+
+## Resolution Summary
+
+| Question | Resolution | Owner |
+|----------|------------|-------|
+| Initial binding (Phase 1) | Pairing codes + QR scan | WSIM/mwsim |
+| Initial binding (Phase 2) | Add alias-based | WSIM |
+| Follow-on authorization | Push notification + Message Center | WSIM/mwsim |
+| Request expiration | 24 hours for binding, 15 min for step-up | WSIM |
+| Limit modification | Decrease only | WSIM/mwsim |
+| Multiple agents | Supported, unique IDs per registration | WSIM |
+| Message Center | Client-side aggregation Phase 1 | mwsim |
+| Message retention | 30 days active, archive indefinite | WSIM |
+
+**Status: APPROVED** - Both teams agree. WSIM to update OpenAPI spec, mwsim to begin implementation.
+
+---
+
+## Phase 1 Implementation Scope
+
+### mwsim Deliverables
+
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| Generate Pairing Code | Settings > AI Agents > Add Agent | P0 |
+| QR Scanner for Agent Binding | Scan agent-displayed QR | P0 |
+| Access Request Approval | Review & approve agent binding | P0 |
+| Agent List | View all connected agents | P0 |
+| Agent Detail | View agent info, spending, activity | P1 |
+| Step-Up Approval | Approve/reject purchase requests | P0 |
+| Push Notification Handler | Handle agent notifications | P0 |
+| Message Center (basic) | Client-side aggregation | P1 |
+
+### WSIM Deliverables
+
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| Pairing Code Generation | `POST /api/mobile/pairing-codes` | P0 |
+| Access Request Endpoints | Agent-facing + mobile-facing | P0 |
+| Agent Management APIs | Already implemented | ✅ |
+| Step-Up APIs | Already implemented | ✅ |
+| Push Notifications | Add `agent.access_request` type | P0 |
