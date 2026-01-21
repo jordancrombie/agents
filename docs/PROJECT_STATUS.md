@@ -205,6 +205,61 @@
 
 ---
 
+## Sprint 1 - Task Assignments
+
+**Sprint Start**: 2026-01-21
+**Sprint Goal**: WSIM staging deployment, SSIM agent auth working, prep work for NSIM/BSIM
+
+### WSIM Team
+
+| # | Task | Priority | Status |
+|---|------|----------|--------|
+| W1 | Run DB migration on staging | P0 | :hourglass: Pending |
+| W2 | Configure staging env vars | P0 | :hourglass: Pending |
+| W3 | Validate APIs on staging | P0 | :white_circle: Not Started |
+| W4 | PR `agentic-support` → main | P1 | :white_circle: Blocked by W1-W3 |
+
+### SSIM Team
+
+| # | Task | Priority | Status |
+|---|------|----------|--------|
+| S1 | Build WSIM mock client | P0 | :white_circle: Not Started |
+| S2 | Implement `/.well-known/ucp` discovery | P0 | :white_circle: Not Started |
+| S3 | Implement agent auth middleware | P0 | :white_circle: Not Started |
+| S4 | Add `ssim_agent_sessions` table | P1 | :white_circle: Not Started |
+| S5 | Implement `POST /api/agent/v1/sessions` | P1 | :white_circle: Not Started |
+
+### NSIM Team (Prep Work)
+
+| # | Task | Priority | Status |
+|---|------|----------|--------|
+| N1 | Add `agentContext` columns to DB | P1 | :white_circle: Not Started |
+| N2 | Prepare authorization endpoint changes | P1 | :white_circle: Not Started |
+| N3 | Review BSIM forwarding spec | P2 | :white_circle: Not Started |
+
+### BSIM Team (Prep Work)
+
+| # | Task | Priority | Status |
+|---|------|----------|--------|
+| B1 | Add `agentContext` columns to DB | P1 | :white_circle: Not Started |
+| B2 | Design agent badge UI component | P1 | :white_circle: Not Started |
+| B3 | Prepare authorization endpoint changes | P2 | :white_circle: Not Started |
+
+### mwsim Team
+
+| # | Task | Priority | Status |
+|---|------|----------|--------|
+| M1 | Agent list screen | P0 | :white_circle: Not Started |
+| M2 | Create agent flow | P0 | :white_circle: Not Started |
+| M3 | Edit agent screen | P1 | :white_circle: Not Started |
+| M4 | Delete/revoke agent | P1 | :white_circle: Not Started |
+| M5 | Step-up notification handler | P0 | :white_circle: Not Started |
+| M6 | Step-up approval screen | P0 | :white_circle: Not Started |
+
+**Note**: mwsim onboarding document available at [MWSIM_ONBOARDING.md](teams/MWSIM_ONBOARDING.md)
+
+---
+
 ## Design Sign-Off
 
 Each team must review their requirements document and sign off before implementation begins.
@@ -338,6 +393,7 @@ Date: _______________
 | 1.5 | 2026-01-21 | BSIM Team | **BSIM FORMAL SIGN-OFF** - Third team to complete sign-off |
 | 1.6 | 2026-01-21 | WSIM Team | **WSIM FORMAL SIGN-OFF** - All 4 teams signed off! OpenAPI spec delivered. |
 | 2.0 | 2026-01-21 | WSIM Team | **WSIM v1.0.0 IMPLEMENTATION COMPLETE** - All P0 features implemented. Pending DB migration. |
+| 2.1 | 2026-01-21 | PM | Added Sprint 1 task assignments; mwsim onboarding document created |
 
 ---
 
