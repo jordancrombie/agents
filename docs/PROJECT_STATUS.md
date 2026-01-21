@@ -11,7 +11,7 @@
 | Metric | Status |
 |--------|--------|
 | Overall Project Health | :yellow_circle: Planning |
-| Design Sign-Off | 0 / 4 teams |
+| Design Sign-Off | 0 / 4 teams (3 reviews complete, awaiting consensus) |
 | Implementation Progress | Not Started |
 | Target Launch | TBD |
 
@@ -65,16 +65,23 @@
 |------|--------|
 | **Team Lead** | [TBD] |
 | **Assigned Developers** | [TBD] |
-| **Requirements Reviewed** | :hourglass: Pending |
-| **Estimate Confirmed** | :hourglass: Pending |
-| **Design Sign-Off** | :x: Not Signed |
+| **Requirements Reviewed** | :white_check_mark: Complete |
+| **Estimate Confirmed** | :hourglass: Revised to 6-8 weeks |
+| **Design Sign-Off** | :hourglass: Conditional - awaiting prerequisites |
 | **Implementation Status** | Not Started |
 
-**Current Blockers**: None
+**Current Blockers**:
+- Q17: WSIM API contract needed by end of Week 1 (**CRITICAL**)
+- Q18: Token caching policy decision needed
+- Q19: Session isolation confirmation needed
 
 **Notes**:
-- Estimated effort: ~5-6 weeks
-- 4 open questions pending resolution
+- Original estimate: ~5-6 weeks → **Revised: 6-8 weeks**
+- Review document: [SSIM_REVIEW.md](teams/SSIM_REVIEW.md)
+- 4 original questions responded to (Q1-Q4)
+- 5 new questions raised (Q17-Q21)
+- Recommends moving MCP server from P1 to P2
+- Conditional sign-off pending Q17/Q18/Q19 resolution
 
 ---
 
@@ -84,17 +91,21 @@
 |------|--------|
 | **Team Lead** | [TBD] |
 | **Assigned Developers** | [TBD] |
-| **Requirements Reviewed** | :hourglass: Pending |
-| **Estimate Confirmed** | :hourglass: Pending |
-| **Design Sign-Off** | :x: Not Signed |
+| **Requirements Reviewed** | :white_check_mark: Complete |
+| **Estimate Confirmed** | :white_check_mark: ~6-8 weeks confirmed |
+| **Design Sign-Off** | :hourglass: Awaiting team consensus on Q5-Q9 |
 | **Implementation Status** | Not Started |
 
 **Current Blockers**: None
 
 **Notes**:
-- Estimated effort: ~6-8 weeks
+- Estimated effort: ~6-8 weeks ✅ Confirmed
 - Critical path component - all other teams depend on WSIM
-- 5 open questions pending resolution
+- Review document: [WSIM_REVIEW.md](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/WSIM_REVIEW.md)
+- 5 questions responded to in PROJECT_QA.md (Q5-Q9)
+- Also responded to Q14 (BSIM ID compatibility), Q17 (OpenAPI spec), Q18 (caching)
+- **NEW**: mwsim requirements drafted - [MWSIM_REQUIREMENTS.md](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/MWSIM_REQUIREMENTS.md)
+- mwsim adds ~3-4 weeks parallel effort for mobile agent management
 
 ---
 
@@ -104,17 +115,18 @@
 |------|--------|
 | **Team Lead** | [TBD] |
 | **Assigned Developers** | [TBD] |
-| **Requirements Reviewed** | :hourglass: Pending |
-| **Estimate Confirmed** | :hourglass: Pending |
-| **Design Sign-Off** | :x: Not Signed |
+| **Requirements Reviewed** | :white_check_mark: Complete |
+| **Estimate Confirmed** | :white_check_mark: ~2 weeks confirmed |
+| **Design Sign-Off** | :hourglass: Awaiting team consensus on Q10/Q11/Q12 |
 | **Implementation Status** | Not Started |
 
 **Current Blockers**: None
 
 **Notes**:
-- Estimated effort: ~2 weeks
+- Estimated effort: ~2 weeks ✅ Confirmed
 - Lower complexity, mainly pass-through changes
-- 3 open questions pending resolution
+- Review document: [NSIM_REVIEW.md](teams/NSIM_REVIEW.md)
+- 3 open questions responded to in PROJECT_QA.md (Q10, Q11, Q12)
 
 ---
 
@@ -124,17 +136,19 @@
 |------|--------|
 | **Team Lead** | [TBD] |
 | **Assigned Developers** | [TBD] |
-| **Requirements Reviewed** | :hourglass: Pending |
-| **Estimate Confirmed** | :hourglass: Pending |
-| **Design Sign-Off** | :x: Not Signed |
+| **Requirements Reviewed** | :white_check_mark: Complete |
+| **Estimate Confirmed** | :white_check_mark: ~1.5-2 weeks confirmed |
+| **Design Sign-Off** | :hourglass: Awaiting team consensus on Q13/Q14/Q15 |
 | **Implementation Status** | Not Started |
 
 **Current Blockers**: None
 
 **Notes**:
-- Estimated effort: ~1.5-2 weeks
-- Primarily UI/visibility changes
-- 3 open questions pending resolution
+- Estimated effort: ~1.5-2 weeks ✅ Confirmed
+- Primarily UI/visibility changes + bank-level policy (P1 minimal)
+- 3 questions responded to in PROJECT_QA.md (Q13, Q14, Q15)
+- Confirmed NSIM Q11 (risk scoring delegation to BSIM)
+- Dependency: Need WSIM confirmation on ownerId format for Q14
 
 ---
 
@@ -155,10 +169,10 @@ Each team must review their requirements document and sign off before implementa
 
 | Team | Reviewer | Date | Status | Comments |
 |------|----------|------|--------|----------|
-| SSIM | | | :x: Pending | |
-| WSIM | | | :x: Pending | |
-| NSIM | | | :x: Pending | |
-| BSIM | | | :x: Pending | |
+| SSIM | SSIM Team | 2026-01-21 | :hourglass: Review Complete | Conditional sign-off pending Q17/Q18/Q19 |
+| WSIM | WSIM Team | 2026-01-21 | :hourglass: Review Complete | Awaiting Q5-Q9 consensus; responded to Q14/Q17/Q18 |
+| NSIM | NSIM Team | 2026-01-21 | :hourglass: Review Complete | Awaiting Q10 consensus (Q11/Q12 resolved) |
+| BSIM | BSIM Team | 2026-01-21 | :hourglass: Review Complete | Awaiting Q13/Q14/Q15 consensus |
 
 **Sign-Off Format**:
 ```
