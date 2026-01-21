@@ -218,12 +218,12 @@
 | W2 | Configure staging env vars | P0 | :hourglass: Pending |
 | W3 | Validate APIs on staging | P0 | :white_circle: Not Started |
 | W4 | PR `agentic-support` → main | P1 | :white_circle: Blocked by W1-W3 |
-| W5 | Implement pairing code generation | P0 | :white_circle: Not Started |
-| W6 | Implement access request endpoints | P0 | :white_circle: Not Started |
-| W7 | Add `agent.access_request` notification type | P0 | :white_circle: Not Started |
-| W8 | Update OpenAPI spec with access-request endpoints | P1 | :white_circle: Not Started |
+| W5 | Implement pairing code generation | P0 | :white_check_mark: **Complete** |
+| W6 | Implement access request endpoints | P0 | :white_check_mark: **Complete** |
+| W7 | Add `agent.access_request` notification type | P0 | :white_check_mark: **Complete** |
+| W8 | Update OpenAPI spec with access-request endpoints | P1 | :white_check_mark: **Complete** |
 
-**New**: Agent-initiated credential flow approved (see [USER_AGENT_DESIGN.md](USER_AGENT_DESIGN.md))
+**New**: Agent-initiated credential flow approved and implemented (see [USER_AGENT_DESIGN.md](USER_AGENT_DESIGN.md))
 
 ### SSIM Team
 
