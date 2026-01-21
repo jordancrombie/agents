@@ -59,6 +59,7 @@ This repository contains the design documentation, specifications, and coordinat
 
 ## Documentation
 
+### Design & Specifications
 | Document | Description |
 |----------|-------------|
 | [Protocol Design](docs/PROTOCOL_DESIGN.md) | Full protocol specification |
@@ -66,6 +67,12 @@ This repository contains the design documentation, specifications, and coordinat
 | [WSIM Requirements](docs/teams/WSIM_REQUIREMENTS.md) | Wallet team deliverables |
 | [NSIM Requirements](docs/teams/NSIM_REQUIREMENTS.md) | Payment network deliverables |
 | [BSIM Requirements](docs/teams/BSIM_REQUIREMENTS.md) | Banking deliverables |
+
+### Project Management
+| Document | Description |
+|----------|-------------|
+| [Project Status](docs/PROJECT_STATUS.md) | Milestones, team status, sign-offs |
+| [Questions & Answers](docs/PROJECT_QA.md) | Cross-team Q&A log |
 
 ## Key Flows
 
@@ -110,6 +117,8 @@ This protocol aligns with emerging standards:
 agents/
 ├── docs/
 │   ├── PROTOCOL_DESIGN.md      # Full protocol specification
+│   ├── PROJECT_STATUS.md       # Milestones & sign-off tracker
+│   ├── PROJECT_QA.md           # Questions & answers log
 │   └── teams/
 │       ├── SSIM_REQUIREMENTS.md
 │       ├── WSIM_REQUIREMENTS.md
