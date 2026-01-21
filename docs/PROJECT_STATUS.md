@@ -11,7 +11,7 @@
 | Metric | Status |
 |--------|--------|
 | Overall Project Health | :yellow_circle: Planning |
-| Design Sign-Off | 0 / 4 teams (3 reviews complete, awaiting consensus) |
+| Design Sign-Off | 3 / 4 teams ready (WSIM, NSIM, BSIM ready; SSIM awaiting Q17) |
 | Implementation Progress | Not Started |
 | Target Launch | TBD |
 
@@ -125,7 +125,7 @@
 | **Assigned Developers** | [TBD] |
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~2 weeks confirmed |
-| **Design Sign-Off** | :hourglass: Awaiting team consensus on Q10/Q11/Q12 |
+| **Design Sign-Off** | :white_check_mark: Ready (Q10-Q12 resolved) |
 | **Implementation Status** | Not Started |
 
 **Current Blockers**: None
@@ -134,7 +134,9 @@
 - Estimated effort: ~2 weeks ✅ Confirmed
 - Lower complexity, mainly pass-through changes
 - Review document: [NSIM_REVIEW.md](teams/NSIM_REVIEW.md)
-- 3 open questions responded to in PROJECT_QA.md (Q10, Q11, Q12)
+- **Q10 ✅ RESOLVED** - No validation for MVP, trust the chain
+- **Q11 ✅ RESOLVED** - NSIM passes context, BSIM handles risk
+- **Q12 ✅ RESOLVED** - Include agentContext in existing webhooks
 
 ---
 
@@ -146,7 +148,7 @@
 | **Assigned Developers** | [TBD] |
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~1.5-2 weeks confirmed |
-| **Design Sign-Off** | :hourglass: Awaiting team consensus on Q13/Q15 (Q14 resolved) |
+| **Design Sign-Off** | :white_check_mark: Ready (Q13-Q15 resolved) |
 | **Implementation Status** | Not Started |
 
 **Current Blockers**: None
@@ -154,9 +156,10 @@
 **Notes**:
 - Estimated effort: ~1.5-2 weeks ✅ Confirmed
 - Primarily UI/visibility changes + bank-level policy (P1 minimal)
-- 3 questions responded to in PROJECT_QA.md (Q13, Q14, Q15)
 - Confirmed NSIM Q11 (risk scoring delegation to BSIM)
+- **Q13 ✅ RESOLVED** - Agent badge always shown (no opt-out)
 - **Q14 ✅ RESOLVED** - WSIM confirmed ownerId UUID format, maps via BsimEnrollment
+- **Q15 ✅ RESOLVED** - BSIM decline authority: P1 minimal scope, must support P2 expansion
 
 ---
 
@@ -179,8 +182,8 @@ Each team must review their requirements document and sign off before implementa
 |------|----------|------|--------|----------|
 | SSIM | SSIM Team | 2026-01-21 | :hourglass: Review Complete | Q18-Q21 resolved; awaiting Q17 OpenAPI spec |
 | WSIM | WSIM Team | 2026-01-21 | :white_check_mark: Ready | Q5-Q9 resolved; OpenAPI spec in progress |
-| NSIM | NSIM Team | 2026-01-21 | :hourglass: Review Complete | Awaiting Q10 consensus (Q11/Q12 resolved) |
-| BSIM | BSIM Team | 2026-01-21 | :hourglass: Review Complete | Awaiting Q13/Q15 consensus (Q14 resolved) |
+| NSIM | NSIM Team | 2026-01-21 | :white_check_mark: Ready | Q10-Q12 resolved; ready for sign-off |
+| BSIM | BSIM Team | 2026-01-21 | :white_check_mark: Ready | Q13-Q15 resolved; ready for sign-off |
 
 **Sign-Off Format**:
 ```
@@ -281,6 +284,7 @@ Date: _______________
 |---------|------|--------|---------|
 | 1.0 | 2026-01-21 | Design Team | Initial document |
 | 1.1 | 2026-01-21 | WSIM Team | Q5-Q9 resolved, Q14 confirmed, Q17 in progress |
+| 1.2 | 2026-01-21 | PM | Q10, Q13, Q15 resolved; NSIM/BSIM ready for sign-off |
 
 ---
 

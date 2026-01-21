@@ -48,12 +48,12 @@ This document tracks questions raised by teams during design review and implemen
 | Q7 | WSIM | Multiple payment methods per agent | ✅ Resolved | Medium |
 | Q8 | WSIM | Daily limit timezone handling | ✅ Resolved | Medium |
 | Q9 | WSIM | mwsim agent management | ✅ Resolved | **High** |
-| Q10 | NSIM | Agent context validation | Under Discussion | Medium |
-| Q11 | NSIM | Risk scoring delegation | Under Discussion | Medium |
+| Q10 | NSIM | Agent context validation | ✅ Resolved | Medium |
+| Q11 | NSIM | Risk scoring delegation | ✅ Resolved | Medium |
 | Q12 | NSIM | Agent-specific webhook events | ✅ Resolved | Low |
-| Q13 | BSIM | Agent badge opt-in | Open | Low |
+| Q13 | BSIM | Agent badge opt-in | ✅ Resolved | Low |
 | Q14 | BSIM | Agent ownership verification | ✅ Resolved | Medium |
-| Q15 | BSIM | Agent transaction decline authority | Open | High |
+| Q15 | BSIM | Agent transaction decline authority | ✅ Resolved | High |
 | Q17 | SSIM | WSIM Mock Service Contract | ✅ In Progress | **Critical** |
 | Q18 | SSIM | Token Caching Policy | ✅ Resolved | High |
 | Q19 | SSIM | Agent vs Human Session Interaction | ✅ Resolved | High |
@@ -488,7 +488,7 @@ Current design assumes web UI. Mobile support would expand access but increase s
 ### Q10: Agent context validation
 **Asked by**: NSIM Team
 **Date**: 2026-01-21
-**Status**: Under Discussion
+**Status**: ✅ Resolved
 
 **Question**:
 Should NSIM validate agent context against WSIM, or trust the merchant-provided context?
@@ -503,9 +503,11 @@ Validation adds security but introduces latency and WSIM dependency. Trust simpl
   3. SSIM received the token from WSIM - trust the chain
   4. Payment token is already validated by BSIM (who issued it)
   5. Alternative: Log agent context for auditing, flag anomalies in reporting (Phase 3)
+- 2026-01-21 PM: **Approved NSIM recommendation.** No validation for MVP. Add agent context validation to project roadmap for future phases (Phase 3 - auditing/anomaly detection).
 
 **Resolution**:
-[Awaiting team consensus]
+✅ **RESOLVED**: NO validation for MVP. Trust the chain (SSIM→WSIM token). Add to project roadmap: Phase 3 auditing/anomaly detection for agent context.
+**Resolved by**: PM | **Date**: 2026-01-21
 
 ---
 
@@ -598,7 +600,7 @@ Could help merchants who want to handle agent transactions differently. Alternat
 ### Q13: Agent badge opt-in
 **Asked by**: BSIM Team
 **Date**: 2026-01-21
-**Status**: Under Discussion
+**Status**: ✅ Resolved
 
 **Question**:
 Should the agent transaction badge be always shown, or opt-in via user settings?
@@ -618,9 +620,11 @@ Some users may not want visual distinction. Others may want clear visibility of 
   - 🤖 badge always visible on agent transactions
   - Tooltip on hover: "This transaction was initiated by AI Agent: {agentId}"
   - Transaction detail view shows full agent context
+- 2026-01-21 PM: **Approved.** Always shown. Transparency is critical.
 
 **Resolution**:
-[Awaiting cross-team consensus]
+✅ **RESOLVED**: Agent badge ALWAYS SHOWN (no opt-out). Transparency for AI-initiated transactions is critical.
+**Resolved by**: PM | **Date**: 2026-01-21
 
 ---
 
@@ -671,7 +675,7 @@ Could prevent scenarios where Agent A (owned by User X) uses a card belonging to
 ### Q15: Agent transaction decline authority
 **Asked by**: BSIM Team
 **Date**: 2026-01-21
-**Status**: Under Discussion
+**Status**: ✅ Resolved
 
 **Question**:
 Should BSIM have authority to decline agent transactions based on bank-level policy, independent of WSIM limits?
@@ -704,8 +708,11 @@ Bank may want additional controls (e.g., decline all agent transactions above $5
 
   This means BSIM can decline even if WSIM approved, but cannot approve if WSIM declined.
 
+- 2026-01-21 PM: **Approved.** Aligned with BSIM recommendation. Start with P1 minimal scope, but architecture MUST support P2 enhanced capabilities long term.
+
 **Resolution**:
-[Recommend proceeding with P1 minimal scope - awaiting team consensus]
+✅ **RESOLVED**: YES - BSIM has decline authority. P1 = minimal scope (bank-wide toggle + limit). P2 = enhanced capabilities (per-MCC, velocity, opt-in/opt-out, alerts). Design must support P2 expansion.
+**Resolved by**: PM | **Date**: 2026-01-21
 
 ---
 
@@ -760,6 +767,9 @@ Bank may want additional controls (e.g., decline all agent transactions above $5
 | 2026-01-21 | Q9: mwsim full agent management required | Mobile-first user experience | PM + WSIM |
 | 2026-01-21 | Q14: Verify agent owner via BsimEnrollment mapping | Prevent cross-user abuse | BSIM + WSIM |
 | 2026-01-21 | Q17: WSIM providing OpenAPI spec for SSIM mocks | Unblock SSIM Week 2 start | WSIM |
+| 2026-01-21 | Q10: NO validation for MVP, add to Phase 3 roadmap | Trust the chain, avoid WSIM dependency | PM |
+| 2026-01-21 | Q13: Agent badge always shown (no opt-out) | Transparency critical for AI transactions | PM |
+| 2026-01-21 | Q15: BSIM decline authority - P1 minimal, must support P2 | Bank liability requires control, design for expansion | PM |
 
 ---
 
