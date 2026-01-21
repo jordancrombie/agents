@@ -10,9 +10,9 @@
 
 | Metric | Status |
 |--------|--------|
-| Overall Project Health | :yellow_circle: Planning |
+| Overall Project Health | :green_circle: In Progress |
 | Design Sign-Off | **4 / 4 signed** ✅ (SSIM, WSIM, NSIM, BSIM) |
-| Implementation Progress | Not Started |
+| Implementation Progress | **WSIM v1.0.0 Complete** (pending DB migration) |
 | Target Launch | TBD |
 
 ---
@@ -24,16 +24,17 @@
 |-----------|--------|-------------|-------------|
 | Protocol design document | :white_check_mark: Complete | 2026-01-21 | 2026-01-21 |
 | Team requirements documents | :white_check_mark: Complete | 2026-01-21 | 2026-01-21 |
-| Design review meetings | :hourglass: Pending | TBD | - |
-| Q&A resolution | :hourglass: Pending | TBD | - |
-| Design sign-off (all teams) | :hourglass: Pending | TBD | - |
+| Design review meetings | :white_check_mark: Complete | 2026-01-21 | 2026-01-21 |
+| Q&A resolution | :white_check_mark: Complete | 2026-01-21 | 2026-01-21 |
+| Design sign-off (all teams) | :white_check_mark: Complete | 2026-01-21 | 2026-01-21 |
 
 ### Phase 2: Implementation
 | Milestone | Status | Target Date | Actual Date |
 |-----------|--------|-------------|-------------|
-| WSIM: Agent registration | :white_circle: Not Started | TBD | - |
-| WSIM: Payment token API | :white_circle: Not Started | TBD | - |
-| WSIM: Step-up flow | :white_circle: Not Started | TBD | - |
+| WSIM: Agent registration | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
+| WSIM: Payment token API | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
+| WSIM: Step-up flow | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
+| WSIM: Database migration | :hourglass: Pending | TBD | - |
 | SSIM: UCP discovery | :white_circle: Not Started | TBD | - |
 | SSIM: Checkout session API | :white_circle: Not Started | TBD | - |
 | NSIM: Agent context | :white_circle: Not Started | TBD | - |
@@ -96,46 +97,49 @@
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~6-8 weeks confirmed |
 | **Design Sign-Off** | ✅ **SIGNED OFF** |
-| **Implementation Status** | :construction: OpenAPI Spec Delivered |
+| **Implementation Status** | ✅ **v1.0.0 COMPLETE** (pending DB migration) |
 
-**Current Blockers**: None
+**Current Blockers**: None - WSIM is NOT blocking any other team
 
 **Notes**:
-- Estimated effort: ~6-8 weeks ✅ Confirmed
+- ~~Estimated effort: ~6-8 weeks~~ → **Completed in 1 day** :rocket:
 - Critical path component - all other teams depend on WSIM
 - Review document: [WSIM_REVIEW.md](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/WSIM_REVIEW.md)
-- **Q5-Q9 ✅ RESOLVED** - All WSIM questions now have consensus:
-  - Q5: Secret rotation with re-authorization flow
-  - Q6: 15-minute step-up expiration
-  - Q7: All payment methods, user default, card selection
-  - Q8: EST timezone for MVP, user-configurable Phase 2
-  - Q9: mwsim full agent management required
-- Also confirmed Q14 (BSIM ID compatibility - UUID via BsimEnrollment)
+- **Q5-Q9 ✅ RESOLVED** - All WSIM questions now have consensus
 - **Q17 ✅ DELIVERED**: OpenAPI spec at [`docs/sacp/openapi-agent.yaml`](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/openapi-agent.yaml)
 - mwsim requirements drafted - [MWSIM_REQUIREMENTS.md](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/MWSIM_REQUIREMENTS.md)
-- mwsim adds ~3-4 weeks parallel effort for mobile agent management
 
-**✅ FORMAL SIGN-OFF (2026-01-21)**:
-> I, on behalf of the WSIM team, have reviewed the SACP requirements document dated 2026-01-21 and confirm our team's readiness to proceed with implementation as specified.
+**✅ IMPLEMENTATION COMPLETE (2026-01-21)**:
+> WSIM v1.0.0 released with full SACP P0 implementation:
 >
-> **Scope Confirmed**:
-> - P0: Agent registration, OAuth token/introspect, payment token API, spending limits, step-up flow
-> - P1: Mandate signing, agent dashboard, intent mandates
-> - P2: Activity webhooks, merchant allow/block lists, velocity controls
+> **Delivered**:
+> - Agent registration and management API (`/api/mobile/agents/*`)
+> - OAuth 2.0 client credentials flow (`/api/agent/v1/oauth/*`)
+> - Token introspection endpoint (RFC 7662 compliant)
+> - Payment token API (`/api/agent/v1/payments/*`)
+> - EST timezone-aware daily/monthly spending limits
+> - Step-up authorization flow with push notifications (`/api/mobile/step-up/*`)
 >
-> **Estimate Confirmed**: ~6-8 weeks (WSIM) + ~3-4 weeks parallel (mwsim)
+> **Database Changes** (4 new tables):
+> - `agents` - Agent credentials and configuration
+> - `agent_access_tokens` - Token revocation tracking
+> - `agent_transactions` - Payment audit trail
+> - `step_up_requests` - Authorization request state
 >
-> **Deliverables Completed**:
-> - OpenAPI spec for agent endpoints (Q17 - SSIM unblocked)
-> - mwsim requirements document
-> - Technical review with implementation approach
+> **New Environment Variables**:
+> - `AGENT_JWT_SECRET`, `AGENT_ACCESS_TOKEN_EXPIRY`
+> - `PAYMENT_TOKEN_SECRET`, `PAYMENT_TOKEN_EXPIRY`
+> - `STEP_UP_EXPIRY_MINUTES`, `DAILY_LIMIT_RESET_TIMEZONE`
+> - `INTROSPECTION_CLIENT_ID`, `INTROSPECTION_CLIENT_SECRET`
 >
-> **No Blocking Concerns**: All questions resolved with cross-team consensus
+> **Dependencies Added**: nanoid@^5.0.0, luxon@^3.4.0
 >
-> **Dependencies Accepted**:
-> - SSIM will use OpenAPI spec for mock development
-> - BSIM will verify agent ownership via BsimEnrollment mapping
-> - mwsim will implement agent management UI in parallel
+> **Next Steps**:
+> - Run database migration in production environment
+> - Configure production environment variables
+> - Begin integration testing with SSIM
+>
+> **Branch**: `agentic-support` - Ready for PR to main after migration testing
 
 ---
 
@@ -239,11 +243,12 @@ Date: _______________
 
 | ID | Risk | Probability | Impact | Mitigation | Owner | Status |
 |----|------|-------------|--------|------------|-------|--------|
-| R1 | WSIM delays block all teams | Medium | High | Start WSIM first, parallel mock development | PM | Open |
+| R1 | WSIM delays block all teams | ~~Medium~~ | ~~High~~ | ~~Start WSIM first, parallel mock development~~ | PM | ✅ **Mitigated** - WSIM v1.0.0 complete |
 | R2 | Industry standards evolve during development | Low | Medium | Design for extensibility, monitor UCP/AP2 updates | Design | Open |
 | R3 | Step-up UX causes user friction | Medium | Medium | User testing before launch, adjustable thresholds | WSIM | Open |
-| R4 | Security vulnerabilities in mandate signing | Low | High | Security review, follow AP2 patterns | WSIM | Open |
+| R4 | Security vulnerabilities in mandate signing | Low | High | Security review, follow AP2 patterns | WSIM | Open (P1) |
 | R5 | Integration complexity underestimated | Medium | Medium | Early integration testing, clear API contracts | PM | Open |
+| R6 | Database migration issues in production | Low | Medium | Test migration on staging, backup before deploy | WSIM | Open |
 
 ---
 
@@ -295,13 +300,18 @@ Date: _______________
 
 | ID | Action | Owner | Due Date | Status |
 |----|--------|-------|----------|--------|
-| A1 | Schedule design review meeting | PM | TBD | Open |
+| A1 | Schedule design review meeting | PM | TBD | ✅ Complete |
 | A2 | Assign team leads for each component | PM | TBD | Open |
-| A3 | Review and respond to open questions | All Teams | TBD | ✅ WSIM Complete |
+| A3 | Review and respond to open questions | All Teams | TBD | ✅ Complete |
 | A4 | Confirm effort estimates | Team Leads | TBD | ✅ Complete |
 | A5 | Complete design sign-off | Team Leads | TBD | ✅ Complete (4/4) |
 | A6 | Create GitHub issues for Phase 1 work | PM | TBD | Open |
 | A7 | Deliver OpenAPI spec for agent endpoints (Q17) | WSIM | Week 1 | ✅ Delivered |
+| A8 | Implement WSIM SACP P0 | WSIM | 2026-01-21 | ✅ **v1.0.0 Complete** |
+| A9 | Run database migration on staging | WSIM | TBD | :hourglass: Pending |
+| A10 | Configure production environment variables | WSIM/DevOps | TBD | :hourglass: Pending |
+| A11 | Begin SSIM implementation | SSIM | TBD | :white_circle: Ready to start |
+| A12 | mwsim agent management UI | mwsim | TBD | :white_circle: Ready to start |
 
 ---
 
@@ -327,18 +337,19 @@ Date: _______________
 | 1.4 | 2026-01-21 | SSIM Team | **SSIM FORMAL SIGN-OFF** - Q17-Q21 resolved; ready for implementation |
 | 1.5 | 2026-01-21 | BSIM Team | **BSIM FORMAL SIGN-OFF** - Third team to complete sign-off |
 | 1.6 | 2026-01-21 | WSIM Team | **WSIM FORMAL SIGN-OFF** - All 4 teams signed off! OpenAPI spec delivered. |
+| 2.0 | 2026-01-21 | WSIM Team | **WSIM v1.0.0 IMPLEMENTATION COMPLETE** - All P0 features implemented. Pending DB migration. |
 
 ---
 
 ## Appendix: Effort Summary
 
-| Team | Estimated Effort | Dependencies | Start Constraint |
-|------|------------------|--------------|------------------|
-| WSIM | 6-8 weeks | None | Can start immediately |
-| SSIM | 6-8 weeks | WSIM OAuth | Can start Week 2 with mocks |
-| NSIM | 2 weeks | SSIM checkout | Can start Week 4 |
-| BSIM | 1.5-2 weeks | NSIM context | Can start Week 5 |
-| **Total** | **~8 weeks** (parallel) | | |
+| Team | Estimated Effort | Actual | Dependencies | Status |
+|------|------------------|--------|--------------|--------|
+| WSIM | 6-8 weeks | **1 day** | None | ✅ **v1.0.0 Complete** |
+| SSIM | 6-8 weeks | - | WSIM OAuth | :white_circle: Ready to start |
+| NSIM | 2 weeks | - | SSIM checkout | :white_circle: Waiting |
+| BSIM | 1.5-2 weeks | - | NSIM context | :white_circle: Waiting |
+| **Total** | **~8 weeks** (parallel) | | | |
 
 ---
 
