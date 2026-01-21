@@ -69,11 +69,15 @@ This is where mwsim comes in - you own the mobile experience for agent managemen
 
 **This is important**: mwsim is the mobile frontend for WSIM's backend APIs. You are building the UI layer on top of WSIM's agent management and step-up authorization endpoints.
 
-### WSIM Has Already Built (v1.0.0 Complete):
+### WSIM APIs You'll Consume:
 
 | API | Endpoint | Purpose |
 |-----|----------|---------|
-| Agent Management | `POST /api/mobile/agents` | Create new agent |
+| **Pairing Codes** | `POST /api/mobile/pairing-codes` | Generate code for agent binding |
+| **Access Requests** | `GET /api/mobile/access-requests/pending` | List pending agent requests |
+| **Access Requests** | `GET /api/mobile/access-requests/:id` | Get request details |
+| **Access Requests** | `POST /api/mobile/access-requests/:id/approve` | Approve with limits |
+| **Access Requests** | `POST /api/mobile/access-requests/:id/reject` | Reject request |
 | Agent Management | `GET /api/mobile/agents` | List user's agents |
 | Agent Management | `PATCH /api/mobile/agents/:id` | Update agent settings |
 | Agent Management | `DELETE /api/mobile/agents/:id` | Revoke agent |
@@ -94,14 +98,15 @@ This is where mwsim comes in - you own the mobile experience for agent managemen
 
 | Document | Location | Description |
 |----------|----------|-------------|
+| **Credential Flow Design** | [docs/USER_AGENT_DESIGN.md](../USER_AGENT_DESIGN.md) | **START HERE** - Agent binding flow |
 | **Protocol Design** | [docs/PROTOCOL_DESIGN.md](../PROTOCOL_DESIGN.md) | Full protocol specification |
 | **Project Status** | [docs/PROJECT_STATUS.md](../PROJECT_STATUS.md) | Current progress, team status |
-| **Q&A Log** | [docs/PROJECT_QA.md](../PROJECT_QA.md) | All resolved questions |
+| **Q&A Log** | [docs/PROJECT_QA.md](../PROJECT_QA.md) | All resolved questions (Q22-Q28 for mwsim) |
 | **WSIM Requirements** | [WSIM repo](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/WSIM_REQUIREMENTS.md) | Backend requirements |
 | **mwsim Requirements** | [WSIM repo](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/MWSIM_REQUIREMENTS.md) | Your detailed requirements |
 | **WSIM OpenAPI Spec** | [WSIM repo](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/openapi-agent.yaml) | API contract for all endpoints |
 
-**Start here**: Read the [mwsim Requirements](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/MWSIM_REQUIREMENTS.md) document first - it was drafted by WSIM specifically for your team.
+**Start here**: Read the [USER_AGENT_DESIGN.md](../USER_AGENT_DESIGN.md) document first - it contains the approved agent-initiated credential flow that you'll implement.
 
 ---
 
@@ -111,11 +116,16 @@ These decisions affect your implementation:
 
 | Decision | Details | Reference |
 |----------|---------|-----------|
+| **Agent binding** | Pairing codes for Phase 1 | Q22, Q28 |
+| **Access request expiration** | 24 hours | Q23 |
+| **Limit modifications** | User can only decrease limits | Q24 |
+| **Multiple instances** | Same agent can bind to multiple users | Q25 |
+| **Message Center** | Client-side aggregation for Phase 1 | Q26 |
+| **Message retention** | 30 days | Q27 |
 | Step-up expiration | 15 minutes | Q6 |
 | Agent badge | Always shown (transparency) | Q13 |
 | Payment methods | User sets default, can select during step-up | Q7 |
 | Timezone | EST for daily limit reset (MVP) | Q8 |
-| Secret rotation | Support re-authorization flow | Q5 |
 
 ---
 
@@ -123,12 +133,15 @@ These decisions affect your implementation:
 
 | # | Task | Priority | Notes |
 |---|------|----------|-------|
-| M1 | Agent list screen | P0 | `GET /api/mobile/agents` |
-| M2 | Create agent flow | P0 | `POST /api/mobile/agents` with name, limits, permissions |
-| M3 | Edit agent screen | P1 | `PATCH /api/mobile/agents/:id` |
-| M4 | Delete/revoke agent | P1 | `DELETE /api/mobile/agents/:id` with confirmation |
-| M5 | Step-up notification handler | P0 | Receive push, deep link to approval screen |
-| M6 | Step-up approval screen | P0 | Show merchant, amount, agent; approve/reject buttons |
+| M1 | Generate pairing code screen | P0 | User generates code to share with agent |
+| M2 | QR scanner for agent binding | P0 | Alternative binding method |
+| M3 | Access request approval screen | P0 | Review agent's requested permissions |
+| M4 | Agent list screen | P0 | `GET /api/mobile/agents` |
+| M5 | Agent detail/edit screen | P1 | `PATCH /api/mobile/agents/:id` |
+| M6 | Delete/revoke agent | P1 | `DELETE /api/mobile/agents/:id` with confirmation |
+| M7 | Step-up approval screen | P0 | Show merchant, amount, agent; approve/reject buttons |
+| M8 | Push notification handler | P0 | Receive push, deep link to approval screen |
+| M9 | Message Center (client-side aggregation) | P1 | Unified notification hub |
 
 ---
 

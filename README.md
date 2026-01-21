@@ -63,10 +63,12 @@ This repository contains the design documentation, specifications, and coordinat
 | Document | Description |
 |----------|-------------|
 | [Protocol Design](docs/PROTOCOL_DESIGN.md) | Full protocol specification |
+| [Agent Credential Flow](docs/USER_AGENT_DESIGN.md) | Agent-initiated binding flow |
 | [SSIM Requirements](docs/teams/SSIM_REQUIREMENTS.md) | Store team deliverables |
 | [WSIM Requirements](docs/teams/WSIM_REQUIREMENTS.md) | Wallet team deliverables |
 | [NSIM Requirements](docs/teams/NSIM_REQUIREMENTS.md) | Payment network deliverables |
 | [BSIM Requirements](docs/teams/BSIM_REQUIREMENTS.md) | Banking deliverables |
+| [mwsim Onboarding](docs/teams/MWSIM_ONBOARDING.md) | Mobile team onboarding |
 
 ### Project Management
 | Document | Description |
@@ -76,12 +78,15 @@ This repository contains the design documentation, specifications, and coordinat
 
 ## Key Flows
 
-### Flow 1: Agent Registration
-Human registers an agent in their wallet (WSIM):
-1. Navigate to Settings > AI Agents
-2. Configure name, permissions, spending limits
-3. Confirm with passkey authentication
-4. Receive OAuth client credentials
+### Flow 1: Agent Registration (Agent-Initiated)
+Agent requests access to user's wallet:
+1. User generates a pairing code in mwsim (e.g., `WSIM-ABC123-XYZ789`)
+2. User provides pairing code to their AI agent
+3. Agent calls WSIM API to request access with desired permissions
+4. User receives push notification with access request
+5. User reviews agent's requested permissions and sets spending limits
+6. User approves with passkey authentication
+7. Agent receives OAuth client credentials
 
 ### Flow 2: Auto-Approved Purchase
 Agent makes a small purchase within limits:

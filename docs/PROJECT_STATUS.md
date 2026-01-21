@@ -218,6 +218,12 @@
 | W2 | Configure staging env vars | P0 | :hourglass: Pending |
 | W3 | Validate APIs on staging | P0 | :white_circle: Not Started |
 | W4 | PR `agentic-support` → main | P1 | :white_circle: Blocked by W1-W3 |
+| W5 | Implement pairing code generation | P0 | :white_circle: Not Started |
+| W6 | Implement access request endpoints | P0 | :white_circle: Not Started |
+| W7 | Add `agent.access_request` notification type | P0 | :white_circle: Not Started |
+| W8 | Update OpenAPI spec with access-request endpoints | P1 | :white_circle: Not Started |
+
+**New**: Agent-initiated credential flow approved (see [USER_AGENT_DESIGN.md](USER_AGENT_DESIGN.md))
 
 ### SSIM Team
 
@@ -249,14 +255,17 @@
 
 | # | Task | Priority | Status |
 |---|------|----------|--------|
-| M1 | Agent list screen | P0 | :white_circle: Not Started |
-| M2 | Create agent flow | P0 | :white_circle: Not Started |
-| M3 | Edit agent screen | P1 | :white_circle: Not Started |
-| M4 | Delete/revoke agent | P1 | :white_circle: Not Started |
-| M5 | Step-up notification handler | P0 | :white_circle: Not Started |
-| M6 | Step-up approval screen | P0 | :white_circle: Not Started |
+| M1 | Generate pairing code screen | P0 | :white_circle: Not Started |
+| M2 | QR scanner for agent binding | P0 | :white_circle: Not Started |
+| M3 | Access request approval screen | P0 | :white_circle: Not Started |
+| M4 | Agent list screen | P0 | :white_circle: Not Started |
+| M5 | Agent detail/edit screen | P1 | :white_circle: Not Started |
+| M6 | Delete/revoke agent | P1 | :white_circle: Not Started |
+| M7 | Step-up approval screen | P0 | :white_circle: Not Started |
+| M8 | Push notification handler | P0 | :white_circle: Not Started |
+| M9 | Message Center (client-side aggregation) | P1 | :white_circle: Not Started |
 
-**Note**: mwsim onboarding document available at [MWSIM_ONBOARDING.md](teams/MWSIM_ONBOARDING.md)
+**Note**: mwsim onboarding at [MWSIM_ONBOARDING.md](teams/MWSIM_ONBOARDING.md) | Credential flow design at [USER_AGENT_DESIGN.md](USER_AGENT_DESIGN.md)
 
 ---
 

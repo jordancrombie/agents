@@ -59,6 +59,13 @@ This document tracks questions raised by teams during design review and implemen
 | Q19 | SSIM | Agent vs Human Session Interaction | ✅ Resolved | High |
 | Q20 | SSIM | Rate Limiting Requirements | ✅ Resolved | Medium |
 | Q21 | SSIM | WSIM Unavailability Handling | ✅ Resolved | Medium |
+| Q22 | mwsim | User identification for agent binding | ✅ Resolved | **High** |
+| Q23 | mwsim | Access request expiration time | ✅ Resolved | Medium |
+| Q24 | mwsim | Limit modification direction | ✅ Resolved | Medium |
+| Q25 | mwsim | Multiple agent instances | ✅ Resolved | Low |
+| Q26 | mwsim | Message Center architecture | ✅ Resolved | Medium |
+| Q27 | mwsim | Message retention policy | ✅ Resolved | Low |
+| Q28 | Cross-Team | Agent-initiated credential flow | ✅ Resolved | **High** |
 
 ---
 
@@ -716,24 +723,169 @@ Bank may want additional controls (e.g., decline all agent transactions above $5
 
 ---
 
-## Cross-Team Questions
+## mwsim Team Questions
 
-### Q16: [Reserved for cross-team questions]
-**Asked by**:
-**Date**:
-**Status**: Open
+### Q22: User identification for agent binding
+**Asked by**: WSIM Team (reviewing mwsim proposal)
+**Date**: 2026-01-21
+**Status**: ✅ Resolved
 
 **Question**:
-
+How should agents identify which user they want to connect to? Email-based identification has security concerns (enumeration, spam).
 
 **Context**:
-
+mwsim proposed `user_email` in the access request. WSIM raised concerns about email harvesting, spam vectors, and privacy leaks.
 
 **Discussion**:
--
+- 2026-01-21 WSIM Team: **Recommend pairing codes instead of email.**
+  - User generates code in mwsim: `WSIM-ABC123-XYZ789` (expires 24h)
+  - User gives code to agent
+  - Agent submits code → WSIM resolves to user → Push notification
+  - Keeps user identity private until explicitly shared
+- 2026-01-21 mwsim Team: **Partial agree.** Accept pairing codes for Phase 1, but want alias-based push authentication in Phase 2 roadmap.
 
 **Resolution**:
-[Pending]
+✅ **RESOLVED**: Pairing codes for Phase 1. Alias-based (@username) with rate limiting in Phase 2.
+**Resolved by**: WSIM + mwsim | **Date**: 2026-01-21
+
+---
+
+### Q23: Access request expiration time
+**Asked by**: mwsim Team
+**Date**: 2026-01-21
+**Status**: ✅ Resolved
+
+**Question**:
+What expiration time should access requests (agent binding) have? Same 15 minutes as step-up?
+
+**Context**:
+mwsim proposed 15 minutes. WSIM noted that agent setup is not time-critical like checkout.
+
+**Discussion**:
+- 2026-01-21 WSIM Team: **Recommend 24-48 hours.** Agent setup not time-critical. User may be away, need time to review, discuss with family.
+- 2026-01-21 mwsim Team: **Agree with 24 hours.**
+
+**Resolution**:
+✅ **RESOLVED**: 24-hour expiration for access requests (agent binding). 15 minutes remains for step-up (time-critical).
+**Resolved by**: WSIM + mwsim | **Date**: 2026-01-21
+
+---
+
+### Q24: Limit modification direction
+**Asked by**: mwsim Team
+**Date**: 2026-01-21
+**Status**: ✅ Resolved
+
+**Question**:
+Should user be able to INCREASE limits beyond what agent requested?
+
+**Context**:
+Need to determine if approval UI allows only decreasing limits or both directions.
+
+**Discussion**:
+- 2026-01-21 WSIM Team: **Recommend NO - decrease only.** Agent requests what it needs. User granting MORE suggests social engineering. Agent should re-request if higher limits needed.
+- 2026-01-21 mwsim Team: **Agree.**
+
+**Resolution**:
+✅ **RESOLVED**: Users can only DECREASE limits below agent's request or reject permissions. Cannot increase.
+**Resolved by**: WSIM + mwsim | **Date**: 2026-01-21
+
+---
+
+### Q25: Multiple agent instances
+**Asked by**: mwsim Team
+**Date**: 2026-01-21
+**Status**: ✅ Resolved
+
+**Question**:
+Can the same agent name be registered multiple times (different instances)?
+
+**Context**:
+User might have "Claude Shopping" on work laptop and home laptop.
+
+**Discussion**:
+- 2026-01-21 WSIM Team: **Yes, supported.** Each registration creates unique `agent_id` (UUID), `client_id` (`agent_{nanoid}`), `client_secret`. Same user can have multiple agents with same name.
+
+**Resolution**:
+✅ **RESOLVED**: Multiple instances with same name supported. Each gets unique credentials.
+**Resolved by**: WSIM | **Date**: 2026-01-21
+
+---
+
+### Q26: Message Center architecture
+**Asked by**: mwsim Team
+**Date**: 2026-01-21
+**Status**: ✅ Resolved
+
+**Question**:
+Should Message Center use WSIM-aggregated API (Option A) or client-side aggregation (Option B)?
+
+**Context**:
+Message Center aggregates notifications from WSIM, ContractSim, TransferSim.
+
+**Discussion**:
+- 2026-01-21 mwsim Team: **Recommend Option A (WSIM aggregated)** for better UX and consistency.
+- 2026-01-21 WSIM Team: **Recommend Option B (client-side) for Phase 1.** WSIM doesn't currently aggregate ContractSim/TransferSim messages. Defer aggregation to Phase 2 based on learnings.
+- 2026-01-21 mwsim Team: **Agree** to start with client-side.
+
+**Resolution**:
+✅ **RESOLVED**: Client-side aggregation for Phase 1. Re-evaluate WSIM aggregation for Phase 2.
+**Resolved by**: WSIM + mwsim | **Date**: 2026-01-21
+
+---
+
+### Q27: Message retention policy
+**Asked by**: mwsim Team
+**Date**: 2026-01-21
+**Status**: ✅ Resolved
+
+**Question**:
+How long to keep historical messages in Message Center?
+
+**Context**:
+Need to balance storage with user access to history.
+
+**Discussion**:
+- 2026-01-21 WSIM Team: Proposed policy:
+  - **Actionable messages** (pending step-ups, access requests): Until resolved or expired
+  - **Informational messages** (transaction completed): 30 days in database, indefinite in archive
+  - **User dismissal**: Soft-deletes from UI
+
+**Resolution**:
+✅ **RESOLVED**: 30-day active retention, indefinite archive. User can dismiss messages.
+**Resolved by**: WSIM | **Date**: 2026-01-21
+
+---
+
+## Cross-Team Questions
+
+### Q28: Agent-initiated credential flow
+**Asked by**: mwsim Team
+**Date**: 2026-01-21
+**Status**: ✅ Resolved
+**Reference**: [USER_AGENT_DESIGN.md](USER_AGENT_DESIGN.md)
+
+**Question**:
+Should we replace credential display (copy/paste) with agent-initiated access request flow?
+
+**Context**:
+Current design displays client_id/secret in UI for user to copy. Security and UX concerns: secret visible on screen, manual copy/paste errors, no audit trail.
+
+**Discussion**:
+- 2026-01-21 mwsim Team: **Proposed agent-initiated flow** with three options:
+  1. Push notification approval (primary)
+  2. QR code scan (in-person)
+  3. OAuth web flow (enterprise)
+- 2026-01-21 WSIM Team: **Support with modifications:**
+  - Pairing codes (not email) for Phase 1
+  - 24-hour expiration for access requests
+  - Limit modification restricted to decreases
+  - Client-side Message Center for Phase 1
+- 2026-01-21 mwsim Team: **Accepted** all modifications
+
+**Resolution**:
+✅ **RESOLVED**: Agent-initiated credential flow approved. Phase 1: Pairing codes + QR scan. Phase 2: Add alias-based. Credentials never displayed in UI.
+**Resolved by**: WSIM + mwsim | **Date**: 2026-01-21
 
 ---
 
@@ -770,6 +922,13 @@ Bank may want additional controls (e.g., decline all agent transactions above $5
 | 2026-01-21 | Q10: NO validation for MVP, add to Phase 3 roadmap | Trust the chain, avoid WSIM dependency | PM |
 | 2026-01-21 | Q13: Agent badge always shown (no opt-out) | Transparency critical for AI transactions | PM |
 | 2026-01-21 | Q15: BSIM decline authority - P1 minimal, must support P2 | Bank liability requires control, design for expansion | PM |
+| 2026-01-21 | Q22: Pairing codes for agent binding (Phase 1) | Security - avoid email enumeration/spam | WSIM + mwsim |
+| 2026-01-21 | Q23: 24-hour expiration for access requests | Agent setup not time-critical like checkout | WSIM + mwsim |
+| 2026-01-21 | Q24: Limit modification - decrease only | Prevent social engineering attacks | WSIM + mwsim |
+| 2026-01-21 | Q25: Multiple agent instances supported | User flexibility (work/home laptops) | WSIM |
+| 2026-01-21 | Q26: Client-side Message Center for Phase 1 | Defer WSIM aggregation complexity | WSIM + mwsim |
+| 2026-01-21 | Q27: 30-day message retention | Balance storage with user access | WSIM |
+| 2026-01-21 | Q28: Agent-initiated credential flow approved | Security improvement - credentials never displayed | WSIM + mwsim |
 
 ---
 
