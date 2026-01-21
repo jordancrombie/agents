@@ -39,10 +39,10 @@ This document tracks questions raised by teams during design review and implemen
 
 | ID | Team | Question | Status | Priority |
 |----|------|----------|--------|----------|
-| Q1 | SSIM | Session expiration configurability | SSIM Responded | Medium |
-| Q2 | SSIM | Multiple shipping options | SSIM Responded | Low |
-| Q3 | SSIM | Promo code support for agents | SSIM Responded | Low |
-| Q4 | SSIM | Partial fulfillment handling | SSIM Responded | Medium |
+| Q1 | SSIM | Session expiration configurability | ✅ Resolved | Medium |
+| Q2 | SSIM | Multiple shipping options | ✅ Resolved | Low |
+| Q3 | SSIM | Promo code support for agents | ✅ Resolved | Low |
+| Q4 | SSIM | Partial fulfillment handling | ✅ Resolved | Medium |
 | Q5 | WSIM | Agent secret rotation | WSIM Responded | Medium |
 | Q6 | WSIM | Step-up expiration time | WSIM Responded | High |
 | Q7 | WSIM | Multiple payment methods per agent | WSIM Responded | Medium |
@@ -55,10 +55,10 @@ This document tracks questions raised by teams during design review and implemen
 | Q14 | BSIM | Agent ownership verification | Open | Medium |
 | Q15 | BSIM | Agent transaction decline authority | Open | High |
 | Q17 | SSIM | WSIM Mock Service Contract | Open | **Critical** |
-| Q18 | SSIM | Token Caching Policy | Open | High |
-| Q19 | SSIM | Agent vs Human Session Interaction | Open | High |
-| Q20 | SSIM | Rate Limiting Requirements | Open | Medium |
-| Q21 | SSIM | WSIM Unavailability Handling | Open | Medium |
+| Q18 | SSIM | Token Caching Policy | ✅ Resolved | High |
+| Q19 | SSIM | Agent vs Human Session Interaction | ✅ Resolved | High |
+| Q20 | SSIM | Rate Limiting Requirements | ✅ Resolved | Medium |
+| Q21 | SSIM | WSIM Unavailability Handling | ✅ Resolved | Medium |
 
 ---
 
@@ -67,7 +67,7 @@ This document tracks questions raised by teams during design review and implemen
 ### Q1: Session expiration configurability
 **Asked by**: SSIM Team
 **Date**: 2026-01-21
-**Status**: SSIM Responded - Awaiting Consensus
+**Status**: ✅ Resolved
 
 **Question**:
 Should checkout session expiration be configurable per store, or should we use a fixed system-wide default?
@@ -81,16 +81,18 @@ Different merchants may have different needs - some products require quick check
   - Default: 30 minutes
   - Configurable range: 5-60 minutes
   - Stored in store settings, exposed in UCP profile
+- 2026-01-21 PM: **Approved.**
 
 **Resolution**:
-[Awaiting PM/Design confirmation]
+✅ **RESOLVED**: Store-configurable expiration. Default 30 minutes, range 5-60 minutes.
+**Resolved by**: PM | **Date**: 2026-01-21
 
 ---
 
 ### Q2: Multiple shipping options selection
 **Asked by**: SSIM Team
 **Date**: 2026-01-21
-**Status**: SSIM Responded - Awaiting Consensus
+**Status**: ✅ Resolved
 
 **Question**:
 Do we need to support agents selecting from multiple shipping options (standard, express, overnight)?
@@ -104,16 +106,18 @@ Current spec shows single `fulfillment` object. Need to determine if agent shoul
   - Adding shipping option selection requires additional UI work
   - MVP recommendation: Use store's default/cheapest shipping
   - Phase 2: Add `GET /sessions/:id/shipping-options` endpoint and selection
+- 2026-01-21 PM: **Approved.** Will add full shipping support later.
 
 **Resolution**:
-[Awaiting PM/Design confirmation]
+✅ **RESOLVED**: Defer to Phase 2. MVP uses default shipping. Full shipping options in Phase 2.
+**Resolved by**: PM | **Date**: 2026-01-21
 
 ---
 
 ### Q3: Promo code support for agents
 **Asked by**: SSIM Team
 **Date**: 2026-01-21
-**Status**: SSIM Responded - Awaiting Consensus
+**Status**: ✅ Resolved
 
 **Question**:
 Should agents be able to apply promotional codes during checkout?
@@ -127,16 +131,18 @@ This could be useful for agent-specific promotions or loyalty programs, but adds
   - Promo validation logic exists in SSIM but not exposed via API
   - Not critical for MVP demo scenarios
   - Phase 2: Add `promoCode` field to session update endpoint
+- 2026-01-21 PM: **Approved.** Same as Q2 - defer to Phase 2.
 
 **Resolution**:
-[Awaiting PM/Design confirmation]
+✅ **RESOLVED**: Defer to Phase 2. Not needed for MVP.
+**Resolved by**: PM | **Date**: 2026-01-21
 
 ---
 
 ### Q4: Partial fulfillment handling
 **Asked by**: SSIM Team
 **Date**: 2026-01-21
-**Status**: SSIM Responded - Awaiting Consensus
+**Status**: ✅ Resolved
 
 **Question**:
 How should we handle partial fulfillment scenarios (backordered items, split shipments)?
@@ -151,9 +157,11 @@ Current flow assumes all items are available. Need to define behavior when some 
   - MVP: Return `item_unavailable` error with affected items
   - Agent can retry with modified cart
   - Phase 3: Consider backorder/split shipment support
+- 2026-01-21 PM: **Approved.**
 
 **Resolution**:
-[Awaiting PM/Design confirmation]
+✅ **RESOLVED**: MVP rejects unavailable items with `item_unavailable` error. Agent retries with modified cart. Backorder support in Phase 3.
+**Resolved by**: PM | **Date**: 2026-01-21
 
 ---
 
@@ -185,7 +193,7 @@ Without this contract, SSIM cannot build mocks and will be blocked.
 ### Q18: Token Caching Policy
 **Asked by**: SSIM Team
 **Date**: 2026-01-21
-**Status**: Open
+**Status**: ✅ Resolved
 
 **Question**:
 Is SSIM permitted to cache token introspection results for short periods (30-60 seconds)?
@@ -204,17 +212,22 @@ Need WSIM team guidance on:
 3. Should we invalidate cache on token revocation webhook?
 
 **Discussion**:
--
+- 2026-01-21 PM: **Approved token caching with 60-second TTL.**
+  - Security trade-off acceptable for performance gain
+  - 60 seconds is short enough to limit exposure
+  - WSIM team should still confirm no objections
+  - Cache invalidation on revocation webhook is recommended but not required for MVP
 
 **Resolution**:
-[Pending - WSIM team response required]
+✅ **RESOLVED**: Token caching approved with 60-second TTL. WSIM team to confirm no security objections.
+**Resolved by**: PM | **Date**: 2026-01-21
 
 ---
 
 ### Q19: Agent Session vs Human Session Interaction
 **Asked by**: SSIM Team
 **Date**: 2026-01-21
-**Status**: Open
+**Status**: ✅ Resolved
 
 **Question**:
 Can an agent session coexist with a human session for the same store? What happens if a human modifies their cart while an agent is building a session?
@@ -231,16 +244,18 @@ Current SSIM uses session-based (cookie) cart for human users. Agent sessions us
   - Identified by `agentId`, not browser session
   - Do not affect human session state
   - Requesting confirmation this is correct interpretation
+- 2026-01-21 PM: **Confirmed.** Start with complete isolation. In Phase 2, we will add session "sharing" capability (agent can access human's cart or vice versa). Design with this future capability in mind, but implement simple isolation for MVP.
 
 **Resolution**:
-[Pending - Design team confirmation]
+✅ **RESOLVED**: Phase 1 = Complete isolation. Phase 2 = Session sharing capability. Design should anticipate future sharing but implement isolation for MVP.
+**Resolved by**: PM | **Date**: 2026-01-21
 
 ---
 
 ### Q20: Rate Limiting Requirements
 **Asked by**: SSIM Team
 **Date**: 2026-01-21
-**Status**: Open
+**Status**: ✅ Resolved
 
 **Question**:
 What rate limits should apply to agent APIs? Per-agent? Per-owner? Per-store?
@@ -252,17 +267,21 @@ Not specified in requirements. Agents could potentially make many rapid requests
 3. Should limits be configurable per store?
 
 **Discussion**:
--
+- 2026-01-21 PM: Defined rate limiting policy:
+  1. **Baseline**: 1000 requests per minute per agent
+  2. **Exceeded response**: HTTP 429 Too Many Requests
+  3. **Configurability**: Should be configurable per store
 
 **Resolution**:
-[Pending - Design team guidance]
+✅ **RESOLVED**: 1000 req/min baseline per agent. Return 429 when exceeded. Store-configurable limits.
+**Resolved by**: PM | **Date**: 2026-01-21
 
 ---
 
 ### Q21: WSIM Unavailability Handling
 **Asked by**: SSIM Team
 **Date**: 2026-01-21
-**Status**: Open
+**Status**: ✅ Resolved
 
 **Question**:
 What should SSIM do if WSIM becomes unavailable during an active checkout session?
@@ -280,10 +299,15 @@ If WSIM goes down mid-checkout, options are:
 4. Allow completion with cached token (if Q18 caching approved)
 
 **Discussion**:
--
+- 2026-01-21 PM: For MVP, use retry approach + token caching:
+  1. Implement token cache with **60-second TTL** (approved - relates to Q18)
+  2. On WSIM unavailability, **retry with exponential backoff**
+  3. If cached token is valid, allow request to proceed
+  4. If all retries fail and no cached token, return error to agent
 
 **Resolution**:
-[Pending - Design team guidance]
+✅ **RESOLVED**: Retry with exponential backoff. Token cache approved (60s TTL). If cached token valid, proceed. If all fails, return error.
+**Resolved by**: PM | **Date**: 2026-01-21
 
 ---
 
@@ -636,7 +660,16 @@ Bank may want additional controls (e.g., decline all agent transactions above $5
 | 2026-01-21 | Use OAuth 2.0 client credentials for agent auth | Industry standard, aligns with AP2 | Design Team |
 | 2026-01-21 | WSIM as central Credentials Provider | Single point of control for spending limits | Design Team |
 | 2026-01-21 | Tiered approval model | Balance autonomy with human oversight | Product Owner |
-| | | | |
+| 2026-01-21 | Q1: Store-configurable session expiration (30min default, 5-60min range) | Flexibility for different merchant needs | PM |
+| 2026-01-21 | Q2: Defer shipping options to Phase 2 | MVP simplicity, default shipping sufficient | PM |
+| 2026-01-21 | Q3: Defer promo codes to Phase 2 | Not critical for MVP demo | PM |
+| 2026-01-21 | Q4: MVP rejects unavailable items | Partial fulfillment too complex for MVP | PM |
+| 2026-01-21 | Q11: NSIM passes context, BSIM handles risk | Keep NSIM simple, BSIM has risk infrastructure | NSIM + BSIM |
+| 2026-01-21 | Q12: Include agentContext in existing webhooks | Simpler than new event type, gradual adoption | NSIM + SSIM |
+| 2026-01-21 | Q18: Token caching approved (60s TTL) | Performance vs security trade-off acceptable | PM |
+| 2026-01-21 | Q19: Phase 1 isolation, Phase 2 session sharing | Start simple, design for future | PM |
+| 2026-01-21 | Q20: 1000 req/min per agent, store-configurable | Reasonable baseline with flexibility | PM |
+| 2026-01-21 | Q21: Retry + cache on WSIM unavailability | Graceful degradation with fallback | PM |
 
 ---
 
