@@ -43,11 +43,11 @@ This document tracks questions raised by teams during design review and implemen
 | Q2 | SSIM | Multiple shipping options | ✅ Resolved | Low |
 | Q3 | SSIM | Promo code support for agents | ✅ Resolved | Low |
 | Q4 | SSIM | Partial fulfillment handling | ✅ Resolved | Medium |
-| Q5 | WSIM | Agent secret rotation | WSIM Responded | Medium |
-| Q6 | WSIM | Step-up expiration time | WSIM Responded | High |
-| Q7 | WSIM | Multiple payment methods per agent | WSIM Responded | Medium |
-| Q8 | WSIM | Daily limit timezone handling | WSIM Responded | Medium |
-| Q9 | WSIM | mwsim agent management | WSIM Responded | **High** |
+| Q5 | WSIM | Agent secret rotation | PM Input - Awaiting Feedback | Medium |
+| Q6 | WSIM | Step-up expiration time | PM Input - Awaiting Feedback | High |
+| Q7 | WSIM | Multiple payment methods per agent | PM Input - Awaiting Feedback | Medium |
+| Q8 | WSIM | Daily limit timezone handling | PM Input - Awaiting Feedback | Medium |
+| Q9 | WSIM | mwsim agent management | PM Input - Awaiting Feedback | **High** |
 | Q10 | NSIM | Agent context validation | Under Discussion | Medium |
 | Q11 | NSIM | Risk scoring delegation | Under Discussion | Medium |
 | Q12 | NSIM | Agent-specific webhook events | ✅ Resolved | Low |
@@ -316,7 +316,7 @@ If WSIM goes down mid-checkout, options are:
 ### Q5: Agent secret rotation
 **Asked by**: WSIM Team
 **Date**: 2026-01-21
-**Status**: Open
+**Status**: PM Input Provided - Awaiting Team Feedback
 
 **Question**:
 Should agent client secrets be rotatable without requiring full re-registration?
@@ -325,17 +325,25 @@ Should agent client secrets be rotatable without requiring full re-registration?
 Security best practice is to rotate secrets periodically. Need to decide if we support rotation or require new registration.
 
 **Discussion**:
--
+- 2026-01-21 PM: **Yes, support rotation with re-authorization flow.**
+  - WSIM should track which agents have delegated access
+  - Support prompting user to continue/renew access
+  - If approved → automatic secret rotation
+  - If not approved or timeout → kick back to full registration
+  - Agent + WSIM/mwsim should support a flow to:
+    1. Detect when delegation has expired
+    2. Guide user through re-enrollment/approval
+  - This maintains security while avoiding friction of full re-registration
 
 **Resolution**:
-[Pending]
+[Awaiting WSIM team feedback on implementation approach]
 
 ---
 
 ### Q6: Step-up expiration time
 **Asked by**: WSIM Team
 **Date**: 2026-01-21
-**Status**: Open
+**Status**: PM Input Provided - Awaiting Team Feedback
 
 **Question**:
 What should the default step-up request expiration time be?
@@ -344,17 +352,19 @@ What should the default step-up request expiration time be?
 Suggesting 15 minutes. Too short = user misses notification. Too long = stale carts, price changes.
 
 **Discussion**:
--
+- 2026-01-21 PM: **15 minutes is fine.**
+  - Balances user availability with cart freshness
+  - Aligns with WSIM's original suggestion
 
 **Resolution**:
-[Pending]
+[Awaiting WSIM team confirmation]
 
 ---
 
 ### Q7: Multiple payment methods per agent
 **Asked by**: WSIM Team
 **Date**: 2026-01-21
-**Status**: Open
+**Status**: PM Input Provided - Awaiting Team Feedback
 
 **Question**:
 Should agents be able to select from multiple enrolled payment methods, or use a designated default?
@@ -363,17 +373,22 @@ Should agents be able to select from multiple enrolled payment methods, or use a
 Users may have multiple cards enrolled. Need to decide if agent can choose, or always uses owner's default.
 
 **Discussion**:
--
+- 2026-01-21 PM: **Agents can see all payment methods, but user has a default.**
+  - Agent should be able to present all available payment methods to the user
+  - User sets a default payment method in wallet settings
+  - For auto-approved transactions (within limits): use default
+  - For step-up transactions: user can select from available methods during approval
+  - This provides flexibility while maintaining user control
 
 **Resolution**:
-[Pending]
+[Awaiting WSIM team feedback on implementation approach]
 
 ---
 
 ### Q8: Daily limit timezone handling
 **Asked by**: WSIM Team
 **Date**: 2026-01-21
-**Status**: Open
+**Status**: PM Input Provided - Awaiting Team Feedback
 
 **Question**:
 How should we handle timezone for daily spending limits?
@@ -382,17 +397,21 @@ How should we handle timezone for daily spending limits?
 Need to define when the "day" resets - user's local timezone, UTC, or wallet server timezone?
 
 **Discussion**:
--
+- 2026-01-21 PM: **Day resets at midnight local time EST (for now).**
+  - Use Eastern Standard Time as the reference timezone
+  - Simplifies MVP implementation (single timezone)
+  - Future consideration: User-configurable timezone in Phase 2
+  - Note: EST = UTC-5 (or EDT = UTC-4 during daylight saving)
 
 **Resolution**:
-[Pending]
+[Awaiting WSIM team confirmation]
 
 ---
 
 ### Q9: mwsim agent management
 **Asked by**: WSIM Team
 **Date**: 2026-01-21
-**Status**: Open
+**Status**: PM Input Provided - Awaiting Team Feedback
 
 **Question**:
 Should mobile wallet (mwsim) users be able to register and manage agents from the mobile app?
@@ -401,10 +420,20 @@ Should mobile wallet (mwsim) users be able to register and manage agents from th
 Current design assumes web UI. Mobile support would expand access but increase scope.
 
 **Discussion**:
--
+- 2026-01-21 PM: **Yes - mobile support and feature parity is REQUIRED.**
+  - mwsim must have full agent management capability
+  - Mobile is likely to be the **primary user validation mechanism** for step-up flows
+  - Push notifications for step-up approval will go to mwsim
+  - Users should be able to:
+    1. Register new agents from mobile
+    2. View/manage existing agents
+    3. Approve step-up requests via mobile
+    4. Revoke agents from mobile
+  - Feature parity between web (WSIM) and mobile (mwsim) is essential
+  - This aligns with WSIM team's drafted MWSIM_REQUIREMENTS.md
 
 **Resolution**:
-[Pending]
+[Awaiting WSIM/mwsim team confirmation on scope and timeline impact]
 
 ---
 
