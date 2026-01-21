@@ -11,7 +11,7 @@
 | Metric | Status |
 |--------|--------|
 | Overall Project Health | :yellow_circle: Planning |
-| Design Sign-Off | 3 / 4 teams ready (WSIM, NSIM, BSIM ready; SSIM awaiting Q17) |
+| Design Sign-Off | **4 / 4 signed** ✅ (SSIM, WSIM, NSIM, BSIM) |
 | Implementation Progress | Not Started |
 | Target Launch | TBD |
 
@@ -66,24 +66,24 @@
 | **Team Lead** | [TBD] |
 | **Assigned Developers** | [TBD] |
 | **Requirements Reviewed** | :white_check_mark: Complete |
-| **Estimate Confirmed** | :hourglass: Revised to 6-8 weeks |
-| **Design Sign-Off** | :hourglass: Conditional - awaiting prerequisites |
+| **Estimate Confirmed** | :white_check_mark: 6-8 weeks confirmed |
+| **Design Sign-Off** | ✅ **SIGNED OFF** |
 | **Implementation Status** | Not Started |
 
-**Current Blockers**:
-- Q17: WSIM API contract needed by end of Week 1 (**IN PROGRESS** - WSIM drafting spec)
+**Current Blockers**: None
 
 **Notes**:
-- Original estimate: ~5-6 weeks → **Revised: 6-8 weeks**
+- Original estimate: ~5-6 weeks → **Revised: 6-8 weeks** ✅ Confirmed
 - Review document: [SSIM_REVIEW.md](teams/SSIM_REVIEW.md)
 - 4 original questions responded to (Q1-Q4)
-- 5 new questions raised (Q17-Q21)
+- 5 new questions raised (Q17-Q21) - **ALL RESOLVED**
+- Q17 (WSIM API contract) ✅ In Progress - WSIM committed to Week 1 delivery
 - Q18 (Token caching) ✅ Resolved - 60s TTL approved
 - Q19 (Session isolation) ✅ Resolved - Phase 1 isolation confirmed
 - Q20 (Rate limiting) ✅ Resolved - 1000 req/min baseline
 - Q21 (WSIM unavailability) ✅ Resolved - Retry + cache
-- Recommends moving MCP server from P1 to P2
-- **Unblocked once WSIM delivers Q17 OpenAPI spec**
+- MCP server deferred to P2 (approved)
+- **Ready to begin implementation Week 2 with WSIM mocks**
 
 ---
 
@@ -95,8 +95,8 @@
 | **Assigned Developers** | [TBD] |
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~6-8 weeks confirmed |
-| **Design Sign-Off** | :white_check_mark: Q5-Q9 Resolved |
-| **Implementation Status** | :construction: OpenAPI Spec In Progress |
+| **Design Sign-Off** | ✅ **SIGNED OFF** |
+| **Implementation Status** | :construction: OpenAPI Spec Delivered |
 
 **Current Blockers**: None
 
@@ -111,9 +111,31 @@
   - Q8: EST timezone for MVP, user-configurable Phase 2
   - Q9: mwsim full agent management required
 - Also confirmed Q14 (BSIM ID compatibility - UUID via BsimEnrollment)
-- **Q17 IN PROGRESS**: Drafting OpenAPI spec (`docs/openapi-agent.yaml`)
-- **NEW**: mwsim requirements drafted - [MWSIM_REQUIREMENTS.md](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/MWSIM_REQUIREMENTS.md)
+- **Q17 ✅ DELIVERED**: OpenAPI spec at [`docs/sacp/openapi-agent.yaml`](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/openapi-agent.yaml)
+- mwsim requirements drafted - [MWSIM_REQUIREMENTS.md](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/MWSIM_REQUIREMENTS.md)
 - mwsim adds ~3-4 weeks parallel effort for mobile agent management
+
+**✅ FORMAL SIGN-OFF (2026-01-21)**:
+> I, on behalf of the WSIM team, have reviewed the SACP requirements document dated 2026-01-21 and confirm our team's readiness to proceed with implementation as specified.
+>
+> **Scope Confirmed**:
+> - P0: Agent registration, OAuth token/introspect, payment token API, spending limits, step-up flow
+> - P1: Mandate signing, agent dashboard, intent mandates
+> - P2: Activity webhooks, merchant allow/block lists, velocity controls
+>
+> **Estimate Confirmed**: ~6-8 weeks (WSIM) + ~3-4 weeks parallel (mwsim)
+>
+> **Deliverables Completed**:
+> - OpenAPI spec for agent endpoints (Q17 - SSIM unblocked)
+> - mwsim requirements document
+> - Technical review with implementation approach
+>
+> **No Blocking Concerns**: All questions resolved with cross-team consensus
+>
+> **Dependencies Accepted**:
+> - SSIM will use OpenAPI spec for mock development
+> - BSIM will verify agent ownership via BsimEnrollment mapping
+> - mwsim will implement agent management UI in parallel
 
 ---
 
@@ -138,6 +160,14 @@
 - **Q11 ✅ RESOLVED** - NSIM passes context, BSIM handles risk
 - **Q12 ✅ RESOLVED** - Include agentContext in existing webhooks
 
+**✅ FORMAL SIGN-OFF (2026-01-21)**:
+> I, on behalf of the NSIM team, have reviewed the SACP requirements document dated 2026-01-21 and confirm our team's readiness to proceed with implementation as specified.
+>
+> **Scope Confirmed**: P0 (agent context in auth, DB storage, BSIM forwarding) + P1 (webhooks, query filtering)
+> **Estimate Confirmed**: ~2 weeks
+> **No Blocking Concerns**: All questions resolved with cross-team consensus
+> **Dependencies Accepted**: SSIM sends agentContext; BSIM accepts agentContext
+
 ---
 
 ### BSIM Team (Banking Simulator)
@@ -148,7 +178,7 @@
 | **Assigned Developers** | [TBD] |
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~1.5-2 weeks confirmed |
-| **Design Sign-Off** | :white_check_mark: Ready (Q13-Q15 resolved) |
+| **Design Sign-Off** | ✅ **SIGNED OFF** (Q13-Q15 resolved) |
 | **Implementation Status** | Not Started |
 
 **Current Blockers**: None
@@ -160,6 +190,14 @@
 - **Q13 ✅ RESOLVED** - Agent badge always shown (no opt-out)
 - **Q14 ✅ RESOLVED** - WSIM confirmed ownerId UUID format, maps via BsimEnrollment
 - **Q15 ✅ RESOLVED** - BSIM decline authority: P1 minimal scope, must support P2 expansion
+
+**✅ FORMAL SIGN-OFF (2026-01-21)**:
+> I, on behalf of the BSIM team, have reviewed the SACP requirements document dated 2026-01-21 and confirm our team's readiness to proceed with implementation as specified.
+>
+> **Scope Confirmed**: P1 (agent context in authorization, DB storage, transaction history UI) + P2 (filtering, summary, policies)
+> **Estimate Confirmed**: ~1.5-2 weeks
+> **No Blocking Concerns**: All questions resolved with cross-team consensus
+> **Dependencies Accepted**: NSIM forwards agentContext in authorization requests
 
 ---
 
@@ -180,10 +218,10 @@ Each team must review their requirements document and sign off before implementa
 
 | Team | Reviewer | Date | Status | Comments |
 |------|----------|------|--------|----------|
-| SSIM | SSIM Team | 2026-01-21 | :hourglass: Review Complete | Q18-Q21 resolved; awaiting Q17 OpenAPI spec |
-| WSIM | WSIM Team | 2026-01-21 | :white_check_mark: Ready | Q5-Q9 resolved; OpenAPI spec in progress |
-| NSIM | NSIM Team | 2026-01-21 | :white_check_mark: Ready | Q10-Q12 resolved; ready for sign-off |
-| BSIM | BSIM Team | 2026-01-21 | :white_check_mark: Ready | Q13-Q15 resolved; ready for sign-off |
+| SSIM | SSIM Team | 2026-01-21 | ✅ **SIGNED OFF** | Q17-Q21 resolved; formal sign-off provided |
+| WSIM | WSIM Team | 2026-01-21 | ✅ **SIGNED OFF** | Q5-Q9 resolved; OpenAPI spec delivered |
+| NSIM | NSIM Team | 2026-01-21 | ✅ **SIGNED OFF** | Q10-Q12 resolved; formal sign-off provided |
+| BSIM | BSIM Team | 2026-01-21 | ✅ **SIGNED OFF** | Q13-Q15 resolved; formal sign-off provided |
 
 **Sign-Off Format**:
 ```
@@ -261,9 +299,9 @@ Date: _______________
 | A2 | Assign team leads for each component | PM | TBD | Open |
 | A3 | Review and respond to open questions | All Teams | TBD | ✅ WSIM Complete |
 | A4 | Confirm effort estimates | Team Leads | TBD | ✅ Complete |
-| A5 | Complete design sign-off | Team Leads | TBD | Open |
+| A5 | Complete design sign-off | Team Leads | TBD | ✅ Complete (4/4) |
 | A6 | Create GitHub issues for Phase 1 work | PM | TBD | Open |
-| A7 | Deliver OpenAPI spec for agent endpoints (Q17) | WSIM | Week 1 | :construction: In Progress |
+| A7 | Deliver OpenAPI spec for agent endpoints (Q17) | WSIM | Week 1 | ✅ Delivered |
 
 ---
 
@@ -285,6 +323,10 @@ Date: _______________
 | 1.0 | 2026-01-21 | Design Team | Initial document |
 | 1.1 | 2026-01-21 | WSIM Team | Q5-Q9 resolved, Q14 confirmed, Q17 in progress |
 | 1.2 | 2026-01-21 | PM | Q10, Q13, Q15 resolved; NSIM/BSIM ready for sign-off |
+| 1.3 | 2026-01-21 | NSIM Team | **NSIM FORMAL SIGN-OFF** - First team to complete sign-off |
+| 1.4 | 2026-01-21 | SSIM Team | **SSIM FORMAL SIGN-OFF** - Q17-Q21 resolved; ready for implementation |
+| 1.5 | 2026-01-21 | BSIM Team | **BSIM FORMAL SIGN-OFF** - Third team to complete sign-off |
+| 1.6 | 2026-01-21 | WSIM Team | **WSIM FORMAL SIGN-OFF** - All 4 teams signed off! OpenAPI spec delivered. |
 
 ---
 
@@ -293,7 +335,7 @@ Date: _______________
 | Team | Estimated Effort | Dependencies | Start Constraint |
 |------|------------------|--------------|------------------|
 | WSIM | 6-8 weeks | None | Can start immediately |
-| SSIM | 5-6 weeks | WSIM OAuth | Can start Week 2 with mocks |
+| SSIM | 6-8 weeks | WSIM OAuth | Can start Week 2 with mocks |
 | NSIM | 2 weeks | SSIM checkout | Can start Week 4 |
 | BSIM | 1.5-2 weeks | NSIM context | Can start Week 5 |
 | **Total** | **~8 weeks** (parallel) | | |
