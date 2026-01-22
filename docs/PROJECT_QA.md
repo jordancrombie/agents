@@ -968,8 +968,29 @@ if (authResult.status === 'approved') {
 
 **Discussion**:
 - 2026-01-22 PM: Identified gap during Sprint 1 review. This is the critical path for MVP.
+- 2026-01-22 NSIM Team: **Clarification needed on scope of "gap".**
 
-*Awaiting team responses...*
+  The framing of Q29 assumes SSIM needs to implement payment processing from scratch. However:
+
+  1. **Does SSIM already call NSIM for human checkout?**
+     - If a human customer completes checkout on SSIM today, does that flow already call NSIM `/authorize` → BSIM?
+     - Or is SSIM using some other payment mechanism (mock payments, direct BSIM, etc.)?
+
+  2. **If SSIM already has payment processing:**
+     - The Sprint 2 work may be significantly simpler than proposed
+     - The agent checkout flow just needs to call the *existing* payment service with `agentContext` added
+     - Tasks S7-S11 may reduce to: "Wire agent checkout to existing payment flow + add agentContext"
+
+  3. **What we already have:**
+     - NSIM v1.2.0 already accepts `agentContext` in authorization requests ✅
+     - NSIM v1.2.0 already forwards `agentContext` to BSIM ✅
+     - BSIM v0.8.0 already accepts and stores `agentContext` ✅
+     - The only missing piece is SSIM passing `agentContext` through its payment call
+
+  **Key Question for SSIM Team:**
+  What is SSIM's current payment flow for human customers? Does it already integrate with NSIM?
+
+*Awaiting SSIM team response on existing payment integration...*
 
 ---
 
