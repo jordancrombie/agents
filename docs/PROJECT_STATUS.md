@@ -12,7 +12,7 @@
 |--------|--------|
 | Overall Project Health | :green_circle: In Progress |
 | Design Sign-Off | **4 / 4 signed** ✅ (SSIM, WSIM, NSIM, BSIM) |
-| Implementation Progress | **WSIM v1.0.0 + NSIM v1.1.0 Complete** (pending DB migrations) |
+| Implementation Progress | **WSIM v1.0.0 + NSIM v1.1.0 + BSIM v0.8.0 Complete** (pending DB migrations) |
 | Target Launch | TBD |
 
 ---
@@ -38,7 +38,7 @@
 | SSIM: UCP discovery | :white_circle: Not Started | TBD | - |
 | SSIM: Checkout session API | :white_circle: Not Started | TBD | - |
 | NSIM: Agent context | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
-| BSIM: Agent visibility | :white_circle: Not Started | TBD | - |
+| BSIM: Agent visibility | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
 
 ### Phase 3: Integration & Testing
 | Milestone | Status | Target Date | Actual Date |
@@ -173,14 +173,21 @@
 > **Dependencies Accepted**: SSIM sends agentContext; BSIM accepts agentContext
 
 **✅ IMPLEMENTATION COMPLETE (2026-01-21)**:
-> NSIM v1.1.0 released with full SACP P0 implementation:
+> NSIM v1.2.0 released with full SACP P0 + P1 implementation:
 >
-> **Delivered**:
+> **P0 Delivered** (v1.1.0):
 > - Accept `agentContext` in authorization requests
 > - Validate required fields (agentId, ownerId, humanPresent) when present
 > - Store agent context in payment transactions with database indexes
 > - Forward agent context to BSIM for issuer visibility
 > - OpenAPI spec v1.3.0 with AgentContext schema
+>
+> **P1 Delivered** (v1.2.0):
+> - Add `agentContext` to all webhook payloads (authorized, captured, voided, refunded, expired, failed)
+> - Query endpoint `GET /api/v1/payments?agentId=...` - filter by agent ID
+> - Query endpoint `GET /api/v1/payments?ownerId=...` - filter by owner ID
+> - Query endpoint `GET /api/v1/payments?humanPresent=...` - filter by human presence
+> - AsyncAPI spec v1.1.0, OpenAPI spec v1.4.0
 >
 > **Database Changes** (new columns on `nsim_payment_transactions`):
 > - `agent_id` - Unique agent identifier
@@ -191,8 +198,7 @@
 >
 > **Next Steps**:
 > - Run database migration in production environment
-> - P1: Add agentContext to webhook payloads
-> - P1: Add query filtering by agent fields
+> - Merge PR to main after migration testing
 >
 > **Branch**: `feature/agentic-support` - Ready for PR to main after migration testing
 
@@ -207,12 +213,12 @@
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~1.5-2 weeks confirmed |
 | **Design Sign-Off** | ✅ **SIGNED OFF** (Q13-Q15 resolved) |
-| **Implementation Status** | Not Started |
+| **Implementation Status** | ✅ **v0.8.0 COMPLETE** (pending DB migration) |
 
-**Current Blockers**: None
+**Current Blockers**: None - BSIM prep work complete
 
 **Notes**:
-- Estimated effort: ~1.5-2 weeks ✅ Confirmed
+- ~~Estimated effort: ~1.5-2 weeks~~ → **Prep work completed in 1 day** :rocket:
 - Primarily UI/visibility changes + bank-level policy (P1 minimal)
 - Confirmed NSIM Q11 (risk scoring delegation to BSIM)
 - **Q13 ✅ RESOLVED** - Agent badge always shown (no opt-out)
@@ -226,6 +232,30 @@
 > **Estimate Confirmed**: ~1.5-2 weeks
 > **No Blocking Concerns**: All questions resolved with cross-team consensus
 > **Dependencies Accepted**: NSIM forwards agentContext in authorization requests
+
+**✅ IMPLEMENTATION COMPLETE (2026-01-21)**:
+> BSIM v0.8.0 released with SACP P1 prep work:
+>
+> **Delivered**:
+> - Agent context columns in `credit_card_transactions` table
+> - Agent context columns in `payment_authorizations` for auth→capture propagation
+> - `AgentContext` interface in payment network types
+> - `PaymentAuthorizationRequest` extended to accept `agentContext` from NSIM
+> - SimNetHandler stores agent context during authorize, propagates to capture/refund
+> - 🤖 Agent badge UI component in transaction history
+> - Transaction detail shows agent ID and "(autonomous)" label
+>
+> **Database Changes** (new columns):
+> - `agent_id` - Agent identifier
+> - `agent_owner_id` - Human owner (WSIM user ID)
+> - `agent_human_present` - Human presence flag
+> - `idx_card_tx_agent` - Index for agent transaction queries
+>
+> **Next Steps**:
+> - Run database migration in production environment
+> - P2: Agent transaction filtering, summary card, bank-level policies
+>
+> **Branch**: `agentic-support` - Ready for PR to main after migration testing
 
 ---
 
@@ -273,9 +303,11 @@
 
 | # | Task | Priority | Status |
 |---|------|----------|--------|
-| B1 | Add `agentContext` columns to DB | P1 | :white_circle: Not Started |
-| B2 | Design agent badge UI component | P1 | :white_circle: Not Started |
-| B3 | Prepare authorization endpoint changes | P2 | :white_circle: Not Started |
+| B1 | Add `agentContext` columns to DB | P1 | :white_check_mark: **Complete** |
+| B2 | Design agent badge UI component | P1 | :white_check_mark: **Complete** |
+| B3 | Prepare authorization endpoint changes | P2 | :white_check_mark: **Complete** |
+
+**Note**: BSIM v0.8.0 complete! All prep work delivered. Branch: `agentic-support`
 
 ### mwsim Team
 
@@ -430,6 +462,8 @@ Date: _______________
 | 2.0 | 2026-01-21 | WSIM Team | **WSIM v1.0.0 IMPLEMENTATION COMPLETE** - All P0 features implemented. Pending DB migration. |
 | 2.1 | 2026-01-21 | PM | Added Sprint 1 task assignments; mwsim onboarding document created |
 | 2.2 | 2026-01-21 | NSIM Team | **NSIM v1.1.0 IMPLEMENTATION COMPLETE** - All P0 features implemented. Pending DB migration. |
+| 2.3 | 2026-01-21 | BSIM Team | **BSIM v0.8.0 IMPLEMENTATION COMPLETE** - All P1 prep work implemented. Pending DB migration. |
+| 2.4 | 2026-01-21 | NSIM Team | **NSIM v1.2.0 P1 COMPLETE** - Webhooks with agentContext + query filtering. |
 
 ---
 
@@ -439,8 +473,8 @@ Date: _______________
 |------|------------------|--------|--------------|--------|
 | WSIM | 6-8 weeks | **1 day** | None | ✅ **v1.0.0 Complete** |
 | SSIM | 6-8 weeks | - | WSIM OAuth | :white_circle: Ready to start |
-| NSIM | 2 weeks | **1 day** | SSIM checkout | ✅ **v1.1.0 Complete** |
-| BSIM | 1.5-2 weeks | - | NSIM context | :white_circle: Ready to start |
+| NSIM | 2 weeks | **1 day** | SSIM checkout | ✅ **v1.2.0 Complete** (P0+P1) |
+| BSIM | 1.5-2 weeks | **1 day** | NSIM context | ✅ **v0.8.0 Complete** |
 | **Total** | **~8 weeks** (parallel) | | | |
 
 ---
