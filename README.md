@@ -75,6 +75,7 @@ This repository contains the design documentation, specifications, and coordinat
 |----------|-------------|
 | [Project Status](docs/PROJECT_STATUS.md) | Milestones, team status, sign-offs |
 | [Questions & Answers](docs/PROJECT_QA.md) | Cross-team Q&A log |
+| [Integration Test Plan](docs/INTEGRATION_TEST_PLAN.md) | End-to-end test scenarios |
 
 ## Key Flows
 
