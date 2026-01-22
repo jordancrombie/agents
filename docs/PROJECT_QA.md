@@ -66,6 +66,7 @@ This document tracks questions raised by teams during design review and implemen
 | Q26 | mwsim | Message Center architecture | ✅ Resolved | Medium |
 | Q27 | mwsim | Message retention policy | ✅ Resolved | Low |
 | Q28 | Cross-Team | Agent-initiated credential flow | ✅ Resolved | **High** |
+| Q29 | Cross-Team | SSIM → NSIM payment processing integration | 🔴 Open | **Critical** |
 
 ---
 
@@ -886,6 +887,89 @@ Current design displays client_id/secret in UI for user to copy. Security and UX
 **Resolution**:
 ✅ **RESOLVED**: Agent-initiated credential flow approved. Phase 1: Pairing codes + QR scan. Phase 2: Add alias-based. Credentials never displayed in UI.
 **Resolved by**: WSIM + mwsim | **Date**: 2026-01-21
+
+---
+
+### Q29: SSIM → NSIM payment processing integration
+**Asked by**: PM
+**Date**: 2026-01-22
+**Status**: 🔴 Open
+**Priority**: **CRITICAL - Required for real payment flow**
+
+**Question**:
+SSIM currently validates payment tokens and creates orders, but does NOT call NSIM to actually process payments. How should we implement the SSIM → NSIM → BSIM payment integration for Sprint 2?
+
+**Context**:
+Sprint 1 deliverables are complete, but the current flow is:
+```
+Agent → SSIM → Creates order (no actual payment) ❌
+```
+
+We need the complete flow:
+```
+Agent → SSIM → NSIM → BSIM → Real payment authorization ✅
+```
+
+Without this integration:
+- No real money flows through the system
+- BSIM won't show agent badges on real transactions
+- Integration tests (Flows 2, 3, 7, 10) cannot fully validate
+
+**Proposed Sprint 2 Tasks for SSIM**:
+
+| Task | Description | Dependencies |
+|------|-------------|--------------|
+| S7 | Implement NSIM payment client | NSIM API contract |
+| S8 | Pass agentContext to NSIM in authorization request | Q10, Q11 resolved |
+| S9 | Handle authorization response (approve/decline/step-up) | - |
+| S10 | Link order to payment reference (authorizationId) | - |
+| S11 | Implement capture on order fulfillment | - |
+
+**Proposed API Call (SSIM → NSIM)**:
+```typescript
+// When agent completes checkout with payment token
+const authResult = await nsimClient.authorize({
+  amount: session.total,
+  currency: 'CAD',
+  merchantId: store.merchantId,
+  paymentToken: paymentToken,  // From WSIM
+  agentContext: {
+    agentId: tokenInfo.agent_id,
+    ownerId: tokenInfo.owner_id,
+    humanPresent: tokenInfo.human_present,
+    mandateId: tokenInfo.mandate_id,
+    mandateType: 'cart'
+  }
+});
+
+if (authResult.status === 'approved') {
+  // Create order with payment reference
+  order.paymentAuthorizationId = authResult.authorizationId;
+  order.status = 'confirmed';
+}
+```
+
+**Questions for Teams**:
+
+1. **SSIM Team**:
+   - Does the proposed task breakdown look correct?
+   - Any concerns about the integration approach?
+   - Estimated effort for S7-S11?
+
+2. **NSIM Team**:
+   - Confirm the authorization API contract for agent transactions
+   - Any additional fields needed in agentContext?
+   - Webhook events SSIM should listen for?
+
+3. **BSIM Team**:
+   - Confirm you'll receive agentContext from NSIM per Q11 resolution
+   - Any changes needed to support the flow?
+   - Verification approach for owner matching (Q14)?
+
+**Discussion**:
+- 2026-01-22 PM: Identified gap during Sprint 1 review. This is the critical path for MVP.
+
+*Awaiting team responses...*
 
 ---
 

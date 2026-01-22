@@ -2,7 +2,7 @@
 
 **Project**: SimToolBox Agent Commerce Protocol (SACP)
 **Project Manager**: [TBD]
-**Last Updated**: 2026-01-22 (Sprint 1 Complete - All QA Tests Passing)
+**Last Updated**: 2026-01-22 (Sprint 2 Planning - Payment Integration Gap Identified)
 
 ---
 
@@ -10,7 +10,7 @@
 
 | Metric | Status |
 |--------|--------|
-| Overall Project Health | :green_circle: **Sprint 1 Complete - Ready for Phase 2** |
+| Overall Project Health | :yellow_circle: **Sprint 2 Planning - Payment Integration Required** |
 | Design Sign-Off | **4 / 4 signed** ✅ (SSIM, WSIM, NSIM, BSIM) |
 | Implementation Progress | **WSIM v1.0.5 + SSIM v2.0.5 + NSIM v1.2.0 + BSIM v0.8.0 + mwsim P0 Complete** |
 | Dev Deployment | ✅ **ALL SERVICES DEPLOYED** (SSIM, BSIM, NewBank, WSIM, NSIM) |
@@ -417,6 +417,66 @@
 
 ---
 
+## Sprint 2 - Payment Processing Integration (PROPOSED)
+
+**Sprint Start**: TBD (Pending team review of Q29)
+**Sprint Goal**: Implement real payment processing flow - SSIM → NSIM → BSIM
+
+### 🔴 CRITICAL GAP IDENTIFIED
+
+**Issue**: SSIM currently validates payment tokens and creates orders, but does NOT call NSIM to actually process payments.
+
+**Current Flow** (incomplete):
+```
+Agent → SSIM → Creates order (no actual payment) ❌
+```
+
+**Required Flow**:
+```
+Agent → SSIM → NSIM → BSIM → Real payment authorization ✅
+```
+
+**Impact**: Without this integration:
+- No real money flows through the system
+- BSIM won't show agent badges on real transactions
+- Integration tests (Flows 2, 3, 7, 10) cannot fully validate
+
+**See Q29 in [PROJECT_QA.md](PROJECT_QA.md) for team discussion.**
+
+### SSIM Team (Sprint 2)
+
+| # | Task | Priority | Status | Notes |
+|---|------|----------|--------|-------|
+| S7 | Implement NSIM payment client | P0 | :white_circle: Not Started | New `src/services/nsim-client.ts` |
+| S8 | Pass agentContext to NSIM | P0 | :white_circle: Not Started | Per Q10, Q11 resolution |
+| S9 | Handle authorization response | P0 | :white_circle: Not Started | Approve/decline/step-up |
+| S10 | Link order to payment reference | P0 | :white_circle: Not Started | Store `authorizationId` on order |
+| S11 | Implement capture on fulfillment | P1 | :white_circle: Not Started | Call NSIM capture when order ships |
+
+### NSIM Team (Sprint 2)
+
+| # | Task | Priority | Status | Notes |
+|---|------|----------|--------|-------|
+| N4 | Confirm authorization API contract | P0 | :white_circle: Awaiting Response | Review Q29 and confirm |
+| N5 | Validate agentContext fields | P0 | :white_circle: Not Started | Already implemented in v1.2.0 |
+
+### BSIM Team (Sprint 2)
+
+| # | Task | Priority | Status | Notes |
+|---|------|----------|--------|-------|
+| B4 | Confirm agentContext receipt from NSIM | P0 | :white_circle: Awaiting Response | Review Q29 and confirm |
+| B5 | Test owner verification (Q14) | P1 | :white_circle: Not Started | BsimEnrollment lookup |
+
+### mwsim Team (Sprint 2)
+
+| # | Task | Priority | Status | Notes |
+|---|------|----------|--------|-------|
+| M5 | Agent detail/edit screen | P1 | :white_circle: Not Started | `PATCH /api/mobile/agents/:id` |
+| M6 | Delete/revoke agent | P1 | :white_circle: Not Started | With confirmation dialog |
+| M9 | Message Center | P1 | :white_circle: Not Started | Client-side aggregation |
+
+---
+
 ## Design Sign-Off
 
 Each team must review their requirements document and sign off before implementation begins.
@@ -531,7 +591,9 @@ Date: _______________
 | A15 | WSIM QA bug fixes (v1.0.1-v1.0.4) | WSIM | 2026-01-22 | ✅ **Complete** |
 | A16 | WSIM token revocation webhooks (v1.0.5) | WSIM | 2026-01-22 | ✅ **Complete** |
 | A17 | Clear dev environment for Phase 2 | DevOps | 2026-01-22 | ✅ **Complete** |
-| A18 | Phase 2 planning | PM | TBD | :white_circle: Not Started |
+| A18 | Phase 2 planning | PM | TBD | :yellow_circle: **In Progress** |
+| A19 | Review Q29 payment processing integration | SSIM, NSIM, BSIM | TBD | :white_circle: Awaiting Response |
+| A20 | Sprint 2 kickoff | PM | TBD | :white_circle: Blocked by A19 |
 
 ---
 
@@ -571,6 +633,7 @@ Date: _______________
 | 3.1 | 2026-01-22 | WSIM Team | **WSIM v1.0.4 QA BUG FIXES** - Token expiry parsing (parseDuration for "1h" format), snake_case API responses, agent list filtering. |
 | 3.2 | 2026-01-22 | WSIM Team | **WSIM v1.0.5 WEBHOOK SYSTEM** - Token revocation webhooks for SSIM. MerchantWebhook model, HMAC-SHA256 signatures, dispatch on revoke/delete/rotate. |
 | 3.3 | 2026-01-22 | QA | **ALL QA TESTS PASSING** - Sprint 1 complete. Dev environment cleared. Ready for Phase 2. |
+| 3.4 | 2026-01-22 | PM | **SPRINT 2 PLANNING** - Identified critical gap: SSIM not processing payments via NSIM. Added Q29 for team review. Sprint 2 tasks proposed. |
 
 ---
 
