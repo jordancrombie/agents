@@ -2,7 +2,7 @@
 
 **Project**: SimToolBox Agent Commerce Protocol (SACP)
 **Project Manager**: [TBD]
-**Last Updated**: 2026-01-21
+**Last Updated**: 2026-01-22 (Sprint 1 Complete - All QA Tests Passing)
 
 ---
 
@@ -10,10 +10,11 @@
 
 | Metric | Status |
 |--------|--------|
-| Overall Project Health | :green_circle: In Progress |
+| Overall Project Health | :green_circle: **Sprint 1 Complete - Ready for Phase 2** |
 | Design Sign-Off | **4 / 4 signed** ✅ (SSIM, WSIM, NSIM, BSIM) |
-| Implementation Progress | **WSIM v1.0.0 + NSIM v1.2.0 + BSIM v0.8.0 Complete** |
+| Implementation Progress | **WSIM v1.0.5 + SSIM v2.0.5 + NSIM v1.2.0 + BSIM v0.8.0 + mwsim P0 Complete** |
 | Dev Deployment | ✅ **ALL SERVICES DEPLOYED** (SSIM, BSIM, NewBank, WSIM, NSIM) |
+| Integration Testing | ✅ **ALL QA TESTS PASSING** (Sprint 1 complete) |
 | Target Launch | TBD |
 
 ---
@@ -39,15 +40,15 @@
 | SSIM: Database migration (Dev) | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
 | NSIM: Database migration (Dev) | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
 | BSIM: Database migration (Dev) | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
-| SSIM: UCP discovery | :white_circle: Not Started | TBD | - |
-| SSIM: Checkout session API | :white_circle: Not Started | TBD | - |
+| SSIM: UCP discovery | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
+| SSIM: Checkout session API | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
 | NSIM: Agent context | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
 | BSIM: Agent visibility | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
 
 ### Phase 3: Integration & Testing
 | Milestone | Status | Target Date | Actual Date |
 |-----------|--------|-------------|-------------|
-| Integration testing | :white_circle: Not Started | TBD | - |
+| Integration testing (Sprint 1) | :white_check_mark: **Complete** | 2026-01-22 | 2026-01-22 |
 | End-to-end demo | :white_circle: Not Started | TBD | - |
 | Security review | :white_circle: Not Started | TBD | - |
 | Documentation finalization | :white_circle: Not Started | TBD | - |
@@ -73,23 +74,55 @@
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: 6-8 weeks confirmed |
 | **Design Sign-Off** | ✅ **SIGNED OFF** |
-| **Implementation Status** | Not Started |
+| **Implementation Status** | ✅ **v2.0.5 COMPLETE** |
 | **Dev Deployment** | ✅ **DEPLOYED** (DB migrated, pipeline updated from `feature/agentic-support`) |
+| **Integration Testing** | ✅ **ALL TESTS PASSING** |
 
 **Current Blockers**: None
 
 **Notes**:
-- Original estimate: ~5-6 weeks → **Revised: 6-8 weeks** ✅ Confirmed
+- ~~Estimated effort: ~6-8 weeks~~ → **Completed in 1 day** :rocket:
 - Review document: [SSIM_REVIEW.md](teams/SSIM_REVIEW.md)
 - 4 original questions responded to (Q1-Q4)
 - 5 new questions raised (Q17-Q21) - **ALL RESOLVED**
-- Q17 (WSIM API contract) ✅ In Progress - WSIM committed to Week 1 delivery
-- Q18 (Token caching) ✅ Resolved - 60s TTL approved
-- Q19 (Session isolation) ✅ Resolved - Phase 1 isolation confirmed
-- Q20 (Rate limiting) ✅ Resolved - 1000 req/min baseline
-- Q21 (WSIM unavailability) ✅ Resolved - Retry + cache
+- Q18 (Token caching) ✅ Implemented - 60s TTL with in-memory cache + webhook invalidation
+- Q19 (Session isolation) ✅ Implemented - Separate `agent_sessions` table
+- Q20 (Rate limiting) ✅ Implemented - 1000 req/min per agent
+- Q21 (WSIM unavailability) ✅ Implemented - Retry with exponential backoff
 - MCP server deferred to P2 (approved)
-- **Ready to begin implementation Week 2 with WSIM mocks**
+
+**✅ IMPLEMENTATION COMPLETE (2026-01-21) + BUG FIXES (2026-01-22)**:
+> SSIM v2.0.5 released with full SACP P0 implementation:
+>
+> **Delivered (v2.0.0)**:
+> - UCP discovery endpoint at `/.well-known/ucp`
+> - Agent authentication middleware with WSIM token introspection
+> - Token caching with 60-second TTL (per Q18)
+> - Rate limiting at 1000 req/min per agent (per Q20)
+> - Retry with exponential backoff on WSIM unavailability (per Q21)
+> - Product Catalog API (`/api/agent/v1/products`, search, get by ID)
+> - Checkout Session API (create, get, update, complete, cancel)
+> - Session state machine with complete isolation from human sessions (per Q19)
+> - Mock mode for development without WSIM
+>
+> **Bug Fixes (v2.0.1 - v2.0.5)**:
+> - v2.0.1: Snake_case API responses to align with SACP convention
+> - v2.0.2: Webhook-based token cache invalidation (`/api/agent/webhooks/token-revoked`)
+> - v2.0.3: Cents-to-dollars conversion for WSIM payment token requests
+> - v2.0.4: Accept snake_case `payment_token` and `mandate_id` in checkout
+> - v2.0.5: Create orders when valid WSIM payment_token provided (not just mock mode)
+>
+> **Database Changes** (new table + columns):
+> - `agent_sessions` table for agent checkout sessions
+> - `agentId`, `agentSessionId` columns on `orders` table
+>
+> **New Files**:
+> - `src/services/wsim-agent.ts` - WSIM agent client with token introspection
+> - `src/middleware/agent-auth.ts` - Authentication and rate limiting
+> - `src/routes/agent-api.ts` - All agent API endpoints
+> - `src/routes/agent-webhooks.ts` - Token revocation webhook endpoint
+>
+> **Branch**: `feature/agentic-support` - Ready for PR to main
 
 ---
 
@@ -102,8 +135,9 @@
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~6-8 weeks confirmed |
 | **Design Sign-Off** | ✅ **SIGNED OFF** |
-| **Implementation Status** | ✅ **v1.0.0 COMPLETE** |
-| **Dev Deployment** | ✅ **DEPLOYED** (Build #1 from `feature/agentic-support`) |
+| **Implementation Status** | ✅ **v1.0.5 COMPLETE** |
+| **Dev Deployment** | ✅ **DEPLOYED** (from `agentic-support` branch) |
+| **Integration Testing** | ✅ **ALL QA TESTS PASSING** |
 
 **Current Blockers**: None - WSIM is NOT blocking any other team
 
@@ -115,10 +149,10 @@
 - **Q17 ✅ DELIVERED**: OpenAPI spec at [`docs/sacp/openapi-agent.yaml`](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/openapi-agent.yaml)
 - mwsim requirements drafted - [MWSIM_REQUIREMENTS.md](https://github.com/jordancrombie/wsim/blob/agentic-support/docs/sacp/MWSIM_REQUIREMENTS.md)
 
-**✅ IMPLEMENTATION COMPLETE (2026-01-21)**:
-> WSIM v1.0.0 released with full SACP P0 implementation:
+**✅ IMPLEMENTATION COMPLETE (2026-01-21) + QA BUG FIXES (2026-01-22)**:
+> WSIM v1.0.5 released with full SACP P0 implementation + QA fixes:
 >
-> **Delivered**:
+> **Delivered (v1.0.0)**:
 > - Agent registration and management API (`/api/mobile/agents/*`)
 > - OAuth 2.0 client credentials flow (`/api/agent/v1/oauth/*`)
 > - Token introspection endpoint (RFC 7662 compliant)
@@ -126,26 +160,39 @@
 > - EST timezone-aware daily/monthly spending limits
 > - Step-up authorization flow with push notifications (`/api/mobile/step-up/*`)
 >
-> **Database Changes** (4 new tables):
+> **Bug Fixes (v1.0.1 - v1.0.4)**:
+> - v1.0.1: Fixed doubled route paths in access-request.ts
+> - v1.0.2: Made max active pairing codes configurable via `MAX_ACTIVE_PAIRING_CODES`
+> - v1.0.3: Fixed agent access request route path
+> - v1.0.4: Fixed token expiry parsing (`parseDuration()` for "1h", "5m" formats), snake_case API responses, agent list filtering (exclude revoked by default)
+>
+> **v1.0.5 - Token Revocation Webhooks**:
+> - `MerchantWebhook` and `WebhookDeliveryLog` models for SSIM notifications
+> - Webhook API (`/api/agent/v1/webhooks`) - register, get, delete, logs, test
+> - Events: `token.revoked`, `agent.deactivated`, `agent.secret_rotated`
+> - HMAC-SHA256 webhook signatures with timestamp for replay protection
+> - Integrated into token revocation, agent deletion, secret rotation flows
+>
+> **Database Changes** (6 new tables total):
 > - `agents` - Agent credentials and configuration
 > - `agent_access_tokens` - Token revocation tracking
 > - `agent_transactions` - Payment audit trail
 > - `step_up_requests` - Authorization request state
+> - `pairing_codes` - User-generated pairing codes for agent binding
+> - `access_requests` - Agent access request tracking
+> - `merchant_webhooks` - Webhook registrations for merchants (v1.0.5)
+> - `webhook_delivery_logs` - Webhook delivery tracking (v1.0.5)
 >
 > **New Environment Variables**:
-> - `AGENT_JWT_SECRET`, `AGENT_ACCESS_TOKEN_EXPIRY`
-> - `PAYMENT_TOKEN_SECRET`, `PAYMENT_TOKEN_EXPIRY`
+> - `AGENT_JWT_SECRET`, `AGENT_ACCESS_TOKEN_EXPIRY` (supports "1h", "5m" format)
+> - `PAYMENT_TOKEN_SECRET`, `PAYMENT_TOKEN_EXPIRY` (supports "1h", "5m" format)
 > - `STEP_UP_EXPIRY_MINUTES`, `DAILY_LIMIT_RESET_TIMEZONE`
 > - `INTROSPECTION_CLIENT_ID`, `INTROSPECTION_CLIENT_SECRET`
+> - `MAX_ACTIVE_PAIRING_CODES` (default: 30 dev, 10 prod)
 >
 > **Dependencies Added**: nanoid@^5.0.0, luxon@^3.4.0
 >
-> **Next Steps**:
-> - Run database migration in production environment
-> - Configure production environment variables
-> - Begin integration testing with SSIM
->
-> **Branch**: `agentic-support` - Ready for PR to main after migration testing
+> **Branch**: `agentic-support` - Ready for PR to main
 
 ---
 
@@ -280,7 +327,7 @@
 | W1b | Run DB migration on staging/prod | P0 | :hourglass: Pending |
 | W2 | Configure dev env vars | P0 | :white_check_mark: **Complete** (8 Buildkite secrets added) |
 | W2b | Configure staging/prod env vars | P0 | :hourglass: Pending |
-| W3 | Validate APIs on dev | P0 | :white_circle: Ready to test |
+| W3 | Validate APIs on dev | P0 | :hourglass: In Progress (SSIM introspection configured) |
 | W4 | PR `agentic-support` → main | P1 | :white_circle: Blocked by W3 |
 | W5 | Implement pairing code generation | P0 | :white_check_mark: **Complete** |
 | W6 | Implement access request endpoints | P0 | :white_check_mark: **Complete** |
@@ -293,11 +340,14 @@
 
 | # | Task | Priority | Status |
 |---|------|----------|--------|
-| S1 | Build WSIM mock client | P0 | :white_circle: Not Started |
-| S2 | Implement `/.well-known/ucp` discovery | P0 | :white_circle: Not Started |
-| S3 | Implement agent auth middleware | P0 | :white_circle: Not Started |
-| S4 | Add `ssim_agent_sessions` table | P1 | :white_circle: Not Started |
-| S5 | Implement `POST /api/agent/v1/sessions` | P1 | :white_circle: Not Started |
+| S1 | Build WSIM mock client | P0 | :white_check_mark: **Complete** (`src/services/wsim-agent.ts`) |
+| S2 | Implement `/.well-known/ucp` discovery | P0 | :white_check_mark: **Complete** (`src/routes/agent-api.ts`) |
+| S3 | Implement agent auth middleware | P0 | :white_check_mark: **Complete** (`src/middleware/agent-auth.ts`) |
+| S4 | Add `agent_sessions` table | P1 | :white_check_mark: **Complete** (Prisma schema + migration) |
+| S5 | Implement `POST /api/agent/v1/sessions` | P1 | :white_check_mark: **Complete** (full session API) |
+| S6 | Configure WSIM introspection credentials | P0 | :white_check_mark: **Complete** (Build #8, mock mode disabled) |
+
+**Note**: SSIM v2.0.0 complete! All Sprint 1 tasks delivered. Real WSIM introspection active. Branch: `feature/agentic-support`
 
 ### NSIM Team (Prep Work)
 
@@ -323,17 +373,47 @@
 
 | # | Task | Priority | Status |
 |---|------|----------|--------|
-| M1 | Generate pairing code screen | P0 | :white_circle: Not Started |
-| M2 | QR scanner for agent binding | P0 | :white_circle: Not Started |
-| M3 | Access request approval screen | P0 | :white_circle: Not Started |
-| M4 | Agent list screen | P0 | :white_circle: Not Started |
+| M1 | Generate pairing code screen | P0 | :white_check_mark: **Complete** |
+| M2 | QR scanner for agent binding | P0 | :white_check_mark: **Complete** |
+| M3 | Access request approval screen | P0 | :white_check_mark: **Complete** |
+| M4 | Agent list screen | P0 | :white_check_mark: **Complete** |
 | M5 | Agent detail/edit screen | P1 | :white_circle: Not Started |
 | M6 | Delete/revoke agent | P1 | :white_circle: Not Started |
-| M7 | Step-up approval screen | P0 | :white_circle: Not Started |
-| M8 | Push notification handler | P0 | :white_circle: Not Started |
+| M7 | Step-up approval screen | P0 | :white_check_mark: **Complete** |
+| M8 | Push notification handler | P0 | :white_check_mark: **Complete** |
 | M9 | Message Center (client-side aggregation) | P1 | :white_circle: Not Started |
 
 **Note**: mwsim onboarding at [MWSIM_ONBOARDING.md](teams/MWSIM_ONBOARDING.md) | Credential flow design at [USER_AGENT_DESIGN.md](USER_AGENT_DESIGN.md)
+
+**✅ mwsim P0 COMPLETE (2026-01-21)**:
+> mwsim P0 tasks delivered with full agent commerce UI:
+>
+> **Delivered**:
+> - Agent list screen (`AgentList.tsx`) - View registered agents, pending requests
+> - Generate pairing code screen (`GeneratePairingCode.tsx`) - 15-minute expiring codes
+> - QR scanner for agent binding (`AgentQrScanner.tsx`) - Alternative binding method
+> - Access request approval screen (`AccessRequestApproval.tsx`) - Review/approve/reject with biometric auth
+> - Step-up approval screen (`StepUpApproval.tsx`) - Approve purchases exceeding limits
+> - Push notification deep linking for all agent notification types
+> - Navigation wiring in App.tsx, Settings menu entry for AI Agents
+>
+> **New Files**:
+> - `app/src/screens/AgentList.tsx`
+> - `app/src/screens/GeneratePairingCode.tsx`
+> - `app/src/screens/AgentQrScanner.tsx`
+> - `app/src/screens/AccessRequestApproval.tsx`
+> - `app/src/screens/StepUpApproval.tsx`
+> - `app/src/services/agent-api.ts`
+> - `app/src/types/agent.ts`
+>
+> **Modified Files**:
+> - `app/App.tsx` - Navigation, deep linking, screen rendering
+> - `app/src/screens/Settings.tsx` - AI Agents menu entry
+> - `app/src/services/notifications.ts` - Agent notification types and handlers
+>
+> **Tested**: Dev build installed on iPhone, pairing code generation verified working
+>
+> **Remaining P1**: Agent detail/edit screen (M5), Delete/revoke agent (M6), Message Center (M9)
 
 ---
 
@@ -444,9 +524,14 @@ Date: _______________
 | A9b | Run database migration on staging/prod | All Teams | TBD | :hourglass: Pending |
 | A10 | Configure dev environment variables | DevOps | 2026-01-21 | ✅ **Complete** |
 | A10b | Configure production environment variables | DevOps | TBD | :hourglass: Pending |
-| A11 | Begin SSIM implementation | SSIM | TBD | :white_circle: Ready to start |
-| A12 | mwsim agent management UI | mwsim | TBD | :white_circle: Ready to start |
-| A13 | Dev integration testing | All Teams | TBD | :white_circle: Ready to start |
+| A11 | Begin SSIM implementation | SSIM | 2026-01-21 | ✅ **v2.0.0 Complete** |
+| A12 | mwsim agent management UI | mwsim | 2026-01-21 | ✅ **P0 Complete** |
+| A13 | Dev integration testing (Sprint 1) | All Teams | 2026-01-22 | ✅ **COMPLETE** |
+| A14 | SSIM bug fixes (v2.0.1-v2.0.5) | SSIM | 2026-01-22 | ✅ **Complete** |
+| A15 | WSIM QA bug fixes (v1.0.1-v1.0.4) | WSIM | 2026-01-22 | ✅ **Complete** |
+| A16 | WSIM token revocation webhooks (v1.0.5) | WSIM | 2026-01-22 | ✅ **Complete** |
+| A17 | Clear dev environment for Phase 2 | DevOps | 2026-01-22 | ✅ **Complete** |
+| A18 | Phase 2 planning | PM | TBD | :white_circle: Not Started |
 
 ---
 
@@ -478,6 +563,14 @@ Date: _______________
 | 2.3 | 2026-01-21 | BSIM Team | **BSIM v0.8.0 IMPLEMENTATION COMPLETE** - All P1 prep work implemented. Pending DB migration. |
 | 2.4 | 2026-01-21 | NSIM Team | **NSIM v1.2.0 P1 COMPLETE** - Webhooks with agentContext + query filtering. |
 | 2.5 | 2026-01-21 | DevOps | **DEV DEPLOYMENT COMPLETE** - All services deployed to dev environment with SACP support. |
+| 2.6 | 2026-01-21 | SSIM Team | **SSIM v2.0.0 IMPLEMENTATION COMPLETE** - All P0 features implemented. UCP, auth middleware, session API. |
+| 2.7 | 2026-01-21 | mwsim Team | **mwsim P0 IMPLEMENTATION COMPLETE** - All P0 screens implemented. Agent list, pairing code, QR scanner, access request approval, step-up approval, push notification handling. |
+| 2.8 | 2026-01-22 | DevOps | **SSIM INTROSPECTION CONFIGURED** - SSIM Build #8 deployed with real WSIM introspection credentials. Mock mode disabled. SSIM ↔ WSIM token validation now active. |
+| 2.9 | 2026-01-22 | SSIM Team | **SSIM v2.0.5 BUG FIXES** - Fixed snake_case API (v2.0.1), added webhook invalidation (v2.0.2), cents-to-dollars conversion (v2.0.3), snake_case checkout params (v2.0.4), real payment_token handling (v2.0.5). |
+| 3.0 | 2026-01-22 | QA | **SPRINT 1 INTEGRATION TESTING COMPLETE** - All 6 test flows passing. Ready for Phase 2. |
+| 3.1 | 2026-01-22 | WSIM Team | **WSIM v1.0.4 QA BUG FIXES** - Token expiry parsing (parseDuration for "1h" format), snake_case API responses, agent list filtering. |
+| 3.2 | 2026-01-22 | WSIM Team | **WSIM v1.0.5 WEBHOOK SYSTEM** - Token revocation webhooks for SSIM. MerchantWebhook model, HMAC-SHA256 signatures, dispatch on revoke/delete/rotate. |
+| 3.3 | 2026-01-22 | QA | **ALL QA TESTS PASSING** - Sprint 1 complete. Dev environment cleared. Ready for Phase 2. |
 
 ---
 
@@ -491,8 +584,8 @@ Date: _______________
 
 | Service | Database Migration | Pipeline Updated | Build # | Health Endpoint |
 |---------|-------------------|------------------|---------|-----------------|
-| **SSIM** | ✅ `agent_sessions` table + order columns | ✅ Agent env vars added | Complete | https://ssim-dev.banksim.ca/health |
-| **Regalmoose** | ✅ (shared with SSIM) | ✅ Agent env vars added | Complete | https://regalmoose.ca/health |
+| **SSIM** | ✅ `agent_sessions` table + order columns | ✅ Agent env vars + introspection creds | #8 | https://ssim-dev.banksim.ca/health |
+| **Regalmoose** | ✅ (shared with SSIM) | ✅ Agent env vars + introspection creds | #8 | https://regalmoose.ca/health |
 | **BSIM** | ✅ Agent columns on cards/transactions | ✅ Already configured | Complete | https://dev.banksim.ca/api/health |
 | **NewBank** | ✅ Agent columns on cards/transactions | ✅ Already configured | Complete | https://newbank-dev.banksim.ca/api/health |
 | **WSIM** | ✅ Tables already existed | ✅ 8 agent env vars added | #1 | https://wsim-dev.banksim.ca/api/health |
@@ -520,19 +613,41 @@ Date: _______________
 | `WSIM_PAYMENT_TOKEN_SECRET_PROD` | Prod | WSIM |
 | `WSIM_INTROSPECTION_CLIENT_ID_PROD` | Prod | WSIM |
 | `WSIM_INTROSPECTION_CLIENT_SECRET_PROD` | Prod | WSIM |
+| `SSIM_WSIM_INTROSPECTION_CLIENT_ID` | Dev | SSIM |
+| `SSIM_WSIM_INTROSPECTION_CLIENT_SECRET` | Dev | SSIM |
+| `SSIM_WSIM_INTROSPECTION_CLIENT_ID_PROD` | Prod | SSIM |
+| `SSIM_WSIM_INTROSPECTION_CLIENT_SECRET_PROD` | Prod | SSIM |
 
 ### Verification Results (2026-01-22)
 
 | Service | Health Endpoint | Status | Version |
 |---------|-----------------|--------|---------|
-| **SSIM** | ssim-dev.banksim.ca/health | ✅ Healthy | - |
-| **Regalmoose** | regalmoose.ca/health | ✅ Healthy | - |
+| **SSIM** | ssim-dev.banksim.ca/health | ✅ Healthy | v2.0.5 |
+| **Regalmoose** | regalmoose.ca/health | ✅ Healthy | v2.0.5 |
 | **BSIM** | dev.banksim.ca/api/health | ✅ Healthy | v0.8.0 |
 | **NewBank** | newbank-dev.banksim.ca/health | ✅ Healthy | - |
-| **WSIM** | wsim-dev.banksim.ca/api/health | ✅ Healthy | v1.0.0 |
+| **WSIM** | wsim-dev.banksim.ca/api/health | ✅ Healthy | v1.0.5 |
 | **NSIM** | payment-dev.banksim.ca/health | ✅ Healthy | - |
 
+### Integration Test Results (2026-01-22)
+
+| Flow | Test | Status |
+|------|------|--------|
+| 01 | UCP Discovery | ✅ Pass |
+| 02 | Product Catalog | ✅ Pass |
+| 03 | Checkout Flow (with step-up) | ✅ Pass |
+| 04 | Auto-approved Purchase | ✅ Pass |
+| 05 | Session Management | ✅ Pass |
+| 06 | Agent Revocation | ✅ Pass |
+| 07 | Token Expiry (1h) | ✅ Pass (fixed in v1.0.4) |
+| 08 | Snake_case API Responses | ✅ Pass (fixed in v1.0.4) |
+| 09 | Agent List Filtering | ✅ Pass (fixed in v1.0.4) |
+
 **UCP Discovery**: ✅ `https://ssim-dev.banksim.ca/.well-known/ucp` returns valid merchant config
+
+**SSIM Token Introspection**: ✅ Mock mode disabled, using real WSIM introspection credentials (Build #8)
+
+**Token Revocation Webhooks**: ✅ WSIM v1.0.5 - SSIM can register webhooks for real-time revocation notifications
 
 ### Verification Commands
 
@@ -554,7 +669,7 @@ curl -sk https://ssim-dev.banksim.ca/.well-known/ucp
 ### Next Steps for Production Deployment
 
 1. [ ] Run database migrations on production RDS (via SSM)
-2. [ ] Verify Buildkite prod secrets are configured
+2. [x] Verify Buildkite prod secrets are configured (WSIM ✅, SSIM ✅)
 3. [ ] Trigger production deployments from `main` branch (after PR merge)
 4. [ ] Verify production health endpoints
 5. [ ] Run integration tests
@@ -565,11 +680,13 @@ curl -sk https://ssim-dev.banksim.ca/.well-known/ucp
 
 | Team | Estimated Effort | Actual | Dependencies | Status |
 |------|------------------|--------|--------------|--------|
-| WSIM | 6-8 weeks | **1 day** | None | ✅ **v1.0.0 Complete** |
-| SSIM | 6-8 weeks | - | WSIM OAuth | :white_circle: Ready to start |
+| WSIM | 6-8 weeks | **2 days** | None | ✅ **v1.0.5 Complete** (incl. QA fixes + webhooks) |
+| SSIM | 6-8 weeks | **2 days** | WSIM OAuth | ✅ **v2.0.5 Complete** (incl. bug fixes) |
 | NSIM | 2 weeks | **1 day** | SSIM checkout | ✅ **v1.2.0 Complete** (P0+P1) |
 | BSIM | 1.5-2 weeks | **1 day** | NSIM context | ✅ **v0.8.0 Complete** |
-| **Total** | **~8 weeks** (parallel) | | | |
+| mwsim | 3-4 weeks | **1 day** | WSIM APIs | ✅ **P0 Complete** |
+| Integration | 1 week | **1 day** | All services | ✅ **All QA Tests Passing** |
+| **Total** | **~8 weeks** (parallel) | **2 days** | | **Sprint 1 Complete** |
 
 ---
 

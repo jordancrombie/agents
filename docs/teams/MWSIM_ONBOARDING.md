@@ -3,7 +3,7 @@
 **Project**: SimToolBox Agent Commerce Protocol (SACP)
 **Team**: mwsim (Mobile Wallet Simulator)
 **Date**: 2026-01-21
-**Status**: Ready to Begin
+**Status**: P0 Complete ✅
 
 ---
 
@@ -131,17 +131,17 @@ These decisions affect your implementation:
 
 ## Sprint 1 Tasks for mwsim
 
-| # | Task | Priority | Notes |
-|---|------|----------|-------|
-| M1 | Generate pairing code screen | P0 | User generates code to share with agent |
-| M2 | QR scanner for agent binding | P0 | Alternative binding method |
-| M3 | Access request approval screen | P0 | Review agent's requested permissions |
-| M4 | Agent list screen | P0 | `GET /api/mobile/agents` |
-| M5 | Agent detail/edit screen | P1 | `PATCH /api/mobile/agents/:id` |
-| M6 | Delete/revoke agent | P1 | `DELETE /api/mobile/agents/:id` with confirmation |
-| M7 | Step-up approval screen | P0 | Show merchant, amount, agent; approve/reject buttons |
-| M8 | Push notification handler | P0 | Receive push, deep link to approval screen |
-| M9 | Message Center (client-side aggregation) | P1 | Unified notification hub |
+| # | Task | Priority | Status | Notes |
+|---|------|----------|--------|-------|
+| M1 | Generate pairing code screen | P0 | ✅ Complete | `GeneratePairingCode.tsx` |
+| M2 | QR scanner for agent binding | P0 | ✅ Complete | `AgentQrScanner.tsx` |
+| M3 | Access request approval screen | P0 | ✅ Complete | `AccessRequestApproval.tsx` |
+| M4 | Agent list screen | P0 | ✅ Complete | `AgentList.tsx` |
+| M5 | Agent detail/edit screen | P1 | Not Started | `PATCH /api/mobile/agents/:id` |
+| M6 | Delete/revoke agent | P1 | Not Started | `DELETE /api/mobile/agents/:id` with confirmation |
+| M7 | Step-up approval screen | P0 | ✅ Complete | `StepUpApproval.tsx` |
+| M8 | Push notification handler | P0 | ✅ Complete | Deep linking in `notifications.ts` |
+| M9 | Message Center (client-side aggregation) | P1 | Not Started | Unified notification hub |
 
 ---
 
