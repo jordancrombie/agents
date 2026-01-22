@@ -12,7 +12,7 @@
 |--------|--------|
 | Overall Project Health | :green_circle: In Progress |
 | Design Sign-Off | **4 / 4 signed** ✅ (SSIM, WSIM, NSIM, BSIM) |
-| Implementation Progress | **WSIM v1.0.0 + NSIM v1.1.0 + BSIM v0.8.0 Complete** (pending DB migrations) |
+| Implementation Progress | **WSIM v1.0.0 + NSIM v1.2.0 + BSIM v0.8.0 Complete** (pending DB migrations) |
 | Target Launch | TBD |
 
 ---
@@ -152,7 +152,7 @@
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~2 weeks confirmed |
 | **Design Sign-Off** | :white_check_mark: Ready (Q10-Q12 resolved) |
-| **Implementation Status** | ✅ **v1.1.0 COMPLETE** (pending DB migration) |
+| **Implementation Status** | ✅ **v1.2.0 COMPLETE** (pending DB migration) |
 
 **Current Blockers**: None - NSIM is NOT blocking any other team
 
@@ -297,7 +297,7 @@
 | N2 | Prepare authorization endpoint changes | P1 | :white_check_mark: **Complete** |
 | N3 | Review BSIM forwarding spec | P2 | :white_check_mark: **Complete** |
 
-**Note**: NSIM v1.1.0 complete! All P0 tasks delivered. Branch: `feature/agentic-support`
+**Note**: NSIM v1.2.0 complete! All P0+P1 tasks delivered. Branch: `feature/agentic-support`
 
 ### BSIM Team (Prep Work)
 
