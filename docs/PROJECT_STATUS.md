@@ -12,7 +12,8 @@
 |--------|--------|
 | Overall Project Health | :green_circle: In Progress |
 | Design Sign-Off | **4 / 4 signed** ✅ (SSIM, WSIM, NSIM, BSIM) |
-| Implementation Progress | **WSIM v1.0.0 + NSIM v1.2.0 + BSIM v0.8.0 Complete** (pending DB migrations) |
+| Implementation Progress | **WSIM v1.0.0 + NSIM v1.2.0 + BSIM v0.8.0 Complete** |
+| Dev Deployment | ✅ **ALL SERVICES DEPLOYED** (SSIM, BSIM, NewBank, WSIM, NSIM) |
 | Target Launch | TBD |
 
 ---
@@ -34,7 +35,10 @@
 | WSIM: Agent registration | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
 | WSIM: Payment token API | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
 | WSIM: Step-up flow | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
-| WSIM: Database migration | :hourglass: Pending | TBD | - |
+| WSIM: Database migration (Dev) | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
+| SSIM: Database migration (Dev) | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
+| NSIM: Database migration (Dev) | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
+| BSIM: Database migration (Dev) | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
 | SSIM: UCP discovery | :white_circle: Not Started | TBD | - |
 | SSIM: Checkout session API | :white_circle: Not Started | TBD | - |
 | NSIM: Agent context | :white_check_mark: **Complete** | 2026-01-21 | 2026-01-21 |
@@ -70,6 +74,7 @@
 | **Estimate Confirmed** | :white_check_mark: 6-8 weeks confirmed |
 | **Design Sign-Off** | ✅ **SIGNED OFF** |
 | **Implementation Status** | Not Started |
+| **Dev Deployment** | ✅ **DEPLOYED** (DB migrated, pipeline updated from `feature/agentic-support`) |
 
 **Current Blockers**: None
 
@@ -97,7 +102,8 @@
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~6-8 weeks confirmed |
 | **Design Sign-Off** | ✅ **SIGNED OFF** |
-| **Implementation Status** | ✅ **v1.0.0 COMPLETE** (pending DB migration) |
+| **Implementation Status** | ✅ **v1.0.0 COMPLETE** |
+| **Dev Deployment** | ✅ **DEPLOYED** (Build #1 from `feature/agentic-support`) |
 
 **Current Blockers**: None - WSIM is NOT blocking any other team
 
@@ -152,7 +158,8 @@
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~2 weeks confirmed |
 | **Design Sign-Off** | :white_check_mark: Ready (Q10-Q12 resolved) |
-| **Implementation Status** | ✅ **v1.2.0 COMPLETE** (pending DB migration) |
+| **Implementation Status** | ✅ **v1.2.0 COMPLETE** |
+| **Dev Deployment** | ✅ **DEPLOYED** (Build #8 from `feature/agentic-support`) |
 
 **Current Blockers**: None - NSIM is NOT blocking any other team
 
@@ -213,7 +220,8 @@
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~1.5-2 weeks confirmed |
 | **Design Sign-Off** | ✅ **SIGNED OFF** (Q13-Q15 resolved) |
-| **Implementation Status** | ✅ **v0.8.0 COMPLETE** (pending DB migration) |
+| **Implementation Status** | ✅ **v0.8.0 COMPLETE** |
+| **Dev Deployment** | ✅ **DEPLOYED** (from `feature/agentic-support`) |
 
 **Current Blockers**: None - BSIM prep work complete
 
@@ -268,10 +276,12 @@
 
 | # | Task | Priority | Status |
 |---|------|----------|--------|
-| W1 | Run DB migration on staging | P0 | :hourglass: Pending |
-| W2 | Configure staging env vars | P0 | :hourglass: Pending |
-| W3 | Validate APIs on staging | P0 | :white_circle: Not Started |
-| W4 | PR `agentic-support` → main | P1 | :white_circle: Blocked by W1-W3 |
+| W1 | Run DB migration on dev | P0 | :white_check_mark: **Complete** (tables already existed) |
+| W1b | Run DB migration on staging/prod | P0 | :hourglass: Pending |
+| W2 | Configure dev env vars | P0 | :white_check_mark: **Complete** (8 Buildkite secrets added) |
+| W2b | Configure staging/prod env vars | P0 | :hourglass: Pending |
+| W3 | Validate APIs on dev | P0 | :white_circle: Ready to test |
+| W4 | PR `agentic-support` → main | P1 | :white_circle: Blocked by W3 |
 | W5 | Implement pairing code generation | P0 | :white_check_mark: **Complete** |
 | W6 | Implement access request endpoints | P0 | :white_check_mark: **Complete** |
 | W7 | Add `agent.access_request` notification type | P0 | :white_check_mark: **Complete** |
@@ -430,10 +440,13 @@ Date: _______________
 | A6 | Create GitHub issues for Phase 1 work | PM | TBD | Open |
 | A7 | Deliver OpenAPI spec for agent endpoints (Q17) | WSIM | Week 1 | ✅ Delivered |
 | A8 | Implement WSIM SACP P0 | WSIM | 2026-01-21 | ✅ **v1.0.0 Complete** |
-| A9 | Run database migration on staging | WSIM | TBD | :hourglass: Pending |
-| A10 | Configure production environment variables | WSIM/DevOps | TBD | :hourglass: Pending |
+| A9 | Run database migration on dev | All Teams | 2026-01-21 | ✅ **Complete** (SSIM, BSIM, NewBank, WSIM, NSIM) |
+| A9b | Run database migration on staging/prod | All Teams | TBD | :hourglass: Pending |
+| A10 | Configure dev environment variables | DevOps | 2026-01-21 | ✅ **Complete** |
+| A10b | Configure production environment variables | DevOps | TBD | :hourglass: Pending |
 | A11 | Begin SSIM implementation | SSIM | TBD | :white_circle: Ready to start |
 | A12 | mwsim agent management UI | mwsim | TBD | :white_circle: Ready to start |
+| A13 | Dev integration testing | All Teams | TBD | :white_circle: Ready to start |
 
 ---
 
@@ -464,6 +477,87 @@ Date: _______________
 | 2.2 | 2026-01-21 | NSIM Team | **NSIM v1.1.0 IMPLEMENTATION COMPLETE** - All P0 features implemented. Pending DB migration. |
 | 2.3 | 2026-01-21 | BSIM Team | **BSIM v0.8.0 IMPLEMENTATION COMPLETE** - All P1 prep work implemented. Pending DB migration. |
 | 2.4 | 2026-01-21 | NSIM Team | **NSIM v1.2.0 P1 COMPLETE** - Webhooks with agentContext + query filtering. |
+| 2.5 | 2026-01-21 | DevOps | **DEV DEPLOYMENT COMPLETE** - All services deployed to dev environment with SACP support. |
+
+---
+
+## Development Deployment Status
+
+**Deployment Date**: 2026-01-21
+**Environment**: Development (192.168.1.96 - Local Docker)
+**Branch**: `feature/agentic-support`
+
+### Deployment Summary
+
+| Service | Database Migration | Pipeline Updated | Build # | Health Endpoint |
+|---------|-------------------|------------------|---------|-----------------|
+| **SSIM** | ✅ `agent_sessions` table + order columns | ✅ Agent env vars added | Complete | https://ssim-dev.banksim.ca/health |
+| **Regalmoose** | ✅ (shared with SSIM) | ✅ Agent env vars added | Complete | https://regalmoose.ca/health |
+| **BSIM** | ✅ Agent columns on cards/transactions | ✅ Already configured | Complete | https://dev.banksim.ca/api/health |
+| **NewBank** | ✅ Agent columns on cards/transactions | ✅ Already configured | Complete | https://newbank-dev.banksim.ca/api/health |
+| **WSIM** | ✅ Tables already existed | ✅ 8 agent env vars added | #1 | https://wsim-dev.banksim.ca/api/health |
+| **NSIM** | ✅ Agent columns on transactions | ✅ Already configured | #8 | https://payment-dev.banksim.ca/health |
+
+### Database Changes Applied
+
+| Database | Tables/Columns Added |
+|----------|---------------------|
+| `ssim` | `agent_sessions` table; `agentId`, `agentSessionId` on `orders` |
+| `bsim` | `agentId`, `agentOwnerId`, `agentMandateId`, `agentMandateType`, `agentHumanPresent` on `cards` and `transactions` |
+| `newbank` | Same as `bsim` (shared codebase) |
+| `wsim` | Tables already existed: `agents`, `agent_access_tokens`, `agent_transactions`, `step_up_requests` |
+| `nsim` | `agent_id`, `agent_owner_id`, `agent_human_present`, `agent_mandate_id`, `agent_mandate_type` on `nsim_payment_transactions` |
+
+### Buildkite Secrets Added
+
+| Secret Name | Environment | Service |
+|-------------|-------------|---------|
+| `WSIM_AGENT_JWT_SECRET_DEV` | Dev | WSIM |
+| `WSIM_PAYMENT_TOKEN_SECRET_DEV` | Dev | WSIM |
+| `WSIM_INTROSPECTION_CLIENT_ID_DEV` | Dev | WSIM |
+| `WSIM_INTROSPECTION_CLIENT_SECRET_DEV` | Dev | WSIM |
+| `WSIM_AGENT_JWT_SECRET_PROD` | Prod | WSIM |
+| `WSIM_PAYMENT_TOKEN_SECRET_PROD` | Prod | WSIM |
+| `WSIM_INTROSPECTION_CLIENT_ID_PROD` | Prod | WSIM |
+| `WSIM_INTROSPECTION_CLIENT_SECRET_PROD` | Prod | WSIM |
+
+### Verification Results (2026-01-22)
+
+| Service | Health Endpoint | Status | Version |
+|---------|-----------------|--------|---------|
+| **SSIM** | ssim-dev.banksim.ca/health | ✅ Healthy | - |
+| **Regalmoose** | regalmoose.ca/health | ✅ Healthy | - |
+| **BSIM** | dev.banksim.ca/api/health | ✅ Healthy | v0.8.0 |
+| **NewBank** | newbank-dev.banksim.ca/health | ✅ Healthy | - |
+| **WSIM** | wsim-dev.banksim.ca/api/health | ✅ Healthy | v1.0.0 |
+| **NSIM** | payment-dev.banksim.ca/health | ✅ Healthy | - |
+
+**UCP Discovery**: ✅ `https://ssim-dev.banksim.ca/.well-known/ucp` returns valid merchant config
+
+### Verification Commands
+
+```bash
+# Check all dev health endpoints
+for url in \
+  "https://ssim-dev.banksim.ca/health" \
+  "https://regalmoose.ca/health" \
+  "https://dev.banksim.ca/api/health" \
+  "https://newbank-dev.banksim.ca/health" \
+  "https://wsim-dev.banksim.ca/api/health" \
+  "https://payment-dev.banksim.ca/health"; do \
+  echo "Checking $url"; curl -sk "$url" | jq -r ".version // .status // \"OK\""; done
+
+# Check SSIM agent discovery endpoint
+curl -sk https://ssim-dev.banksim.ca/.well-known/ucp
+```
+
+### Next Steps for Production Deployment
+
+1. [ ] Run database migrations on production RDS (via SSM)
+2. [ ] Verify Buildkite prod secrets are configured
+3. [ ] Trigger production deployments from `main` branch (after PR merge)
+4. [ ] Verify production health endpoints
+5. [ ] Run integration tests
 
 ---
 
