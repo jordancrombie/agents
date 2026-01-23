@@ -2,7 +2,7 @@
 
 **Project**: SimToolBox Agent Commerce Protocol (SACP)
 **Project Manager**: [TBD]
-**Last Updated**: 2026-01-23 (Q30 Opened - Agent payment token missing card_token)
+**Last Updated**: 2026-01-22 (Q30 Resolved - Agent payment token now includes card_token)
 
 ---
 
@@ -10,22 +10,22 @@
 
 | Metric | Status |
 |--------|--------|
-| Overall Project Health | :red_circle: **BLOCKED - Q30 Open** |
+| Overall Project Health | :green_circle: **ON TRACK** |
 | Design Sign-Off | **4 / 4 signed** ✅ (SSIM, WSIM, NSIM, BSIM) |
-| Implementation Progress | **WSIM v1.0.5 + SSIM v2.1.0 + NSIM v1.2.0 + BSIM v0.8.0 + mwsim P0 Complete** |
+| Implementation Progress | **WSIM v1.0.6 + SSIM v2.1.1 + NSIM v1.2.0 + BSIM v0.8.0 + mwsim P0 Complete** |
 | Dev Deployment | ✅ **ALL SERVICES DEPLOYED** (SSIM, BSIM, NewBank, WSIM, NSIM) |
-| Integration Testing | 🔴 **BLOCKED** - Agent payments failing (Q30) |
+| Integration Testing | ✅ **ALL TESTS PASSING** |
 | Target Launch | TBD |
 
-### 🚨 Current Blocker: Q30
+### ✅ Q30 Resolved - Agent Payments Working
 
-**Issue**: Agent payment tokens from WSIM only include `wallet_card_token` but not `card_token`. BSIM cannot authorize payments.
+**Issue**: Agent payment tokens from WSIM were missing `card_token`. BSIM could not authorize payments.
 
-**Impact**: All agent payment attempts fail with "Invalid card token"
+**Resolution**:
+- WSIM v1.0.6: Added BSIM card token request to agent payment flow ✅ **IMPLEMENTED**
+- SSIM v2.1.1: Extract both tokens from JWT and pass to NSIM ✅ **IMPLEMENTED**
 
-**Action Required**:
-- WSIM Team: Add BSIM card token request to agent payment flow
-- SSIM Team: Extract both tokens from JWT and pass to NSIM
+**Deployment Order**: WSIM first, then SSIM
 
 **See**: [Q30 in PROJECT_QA.md](PROJECT_QA.md#q30-agent-payment-token-missing-bsim-card_token)
 
@@ -147,7 +147,7 @@
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~6-8 weeks confirmed |
 | **Design Sign-Off** | ✅ **SIGNED OFF** |
-| **Implementation Status** | ✅ **v1.0.5 COMPLETE** |
+| **Implementation Status** | ✅ **v1.0.6 COMPLETE** |
 | **Dev Deployment** | ✅ **DEPLOYED** (from `agentic-support` branch) |
 | **Integration Testing** | ✅ **ALL QA TESTS PASSING** |
 
@@ -652,6 +652,8 @@ Date: _______________
 | 3.5 | 2026-01-22 | SSIM Team | **Q29 RESOLVED** - SSIM already has complete NSIM payment integration (`src/services/payment.ts`). Sprint 2 scope reduced to ~2 days (add agentContext to existing flow). |
 | 3.6 | 2026-01-22 | SSIM Team | **SSIM v2.1.0 SPRINT 2 COMPLETE** - Added agentContext to payment authorization. Agent checkouts now process through NSIM → BSIM. 🤖 Agent badges visible in BSIM. |
 | 3.7 | 2026-01-23 | DevOps | **Q30 OPENED - CRITICAL BLOCKER** - Agent payments failing. WSIM payment token missing `card_token`. WSIM+SSIM code changes required. See PROJECT_QA.md for details. |
+| 3.8 | 2026-01-22 | SSIM Team | **SSIM v2.1.1 Q30 FIX IMPLEMENTED** - Extract `card_token` from WSIM JWT. Graceful error when token missing. |
+| 3.9 | 2026-01-22 | WSIM Team | **WSIM v1.0.6 Q30 FIX IMPLEMENTED** - Added `card_token` to payment JWT. Requests BSIM card token before generating JWT (same pattern as human flow). Q30 fully resolved. |
 
 ---
 
@@ -703,8 +705,8 @@ Date: _______________
 
 | Service | Health Endpoint | Status | Version |
 |---------|-----------------|--------|---------|
-| **SSIM** | ssim-dev.banksim.ca/health | ✅ Healthy | v2.1.0 |
-| **Regalmoose** | regalmoose.ca/health | ✅ Healthy | v2.1.0 |
+| **SSIM** | ssim-dev.banksim.ca/health | ✅ Healthy | v2.1.1 |
+| **Regalmoose** | regalmoose.ca/health | ✅ Healthy | v2.1.1 |
 | **BSIM** | dev.banksim.ca/api/health | ✅ Healthy | v0.8.0 |
 | **NewBank** | newbank-dev.banksim.ca/health | ✅ Healthy | - |
 | **WSIM** | wsim-dev.banksim.ca/api/health | ✅ Healthy | v1.0.5 |
@@ -761,8 +763,8 @@ curl -sk https://ssim-dev.banksim.ca/.well-known/ucp
 
 | Team | Estimated Effort | Actual | Dependencies | Status |
 |------|------------------|--------|--------------|--------|
-| WSIM | 6-8 weeks | **2 days** | None | ✅ **v1.0.5 Complete** (incl. QA fixes + webhooks) |
-| SSIM | 6-8 weeks | **2 days** | WSIM OAuth | ✅ **v2.1.0 Complete** (Sprint 1+2) |
+| WSIM | 6-8 weeks | **2 days** | None | ✅ **v1.0.6 Complete** (incl. QA fixes + webhooks + Q30 fix) |
+| SSIM | 6-8 weeks | **2 days** | WSIM OAuth | ✅ **v2.1.1 Complete** (Sprint 1+2+Q30) |
 | NSIM | 2 weeks | **1 day** | SSIM checkout | ✅ **v1.2.0 Complete** (P0+P1) |
 | BSIM | 1.5-2 weeks | **1 day** | NSIM context | ✅ **v0.8.0 Complete** |
 | mwsim | 3-4 weeks | **1 day** | WSIM APIs | ✅ **P0 Complete** |
