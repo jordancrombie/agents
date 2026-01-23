@@ -66,7 +66,8 @@ This document tracks questions raised by teams during design review and implemen
 | Q26 | mwsim | Message Center architecture | ✅ Resolved | Medium |
 | Q27 | mwsim | Message retention policy | ✅ Resolved | Low |
 | Q28 | Cross-Team | Agent-initiated credential flow | ✅ Resolved | **High** |
-| Q29 | Cross-Team | SSIM → NSIM payment processing integration | 🔴 Open | **Critical** |
+| Q29 | Cross-Team | SSIM → NSIM payment processing integration | ✅ Resolved | **Critical** |
+| Q30 | Cross-Team | Agent payment token missing BSIM card_token | 🔴 Open | **Critical** |
 
 ---
 
@@ -893,7 +894,7 @@ Current design displays client_id/secret in UI for user to copy. Security and UX
 ### Q29: SSIM → NSIM payment processing integration
 **Asked by**: PM
 **Date**: 2026-01-22
-**Status**: 🔴 Open
+**Status**: ✅ Resolved
 **Priority**: **CRITICAL - Required for real payment flow**
 
 **Question**:
@@ -915,57 +916,6 @@ Without this integration:
 - BSIM won't show agent badges on real transactions
 - Integration tests (Flows 2, 3, 7, 10) cannot fully validate
 
-**Proposed Sprint 2 Tasks for SSIM**:
-
-| Task | Description | Dependencies |
-|------|-------------|--------------|
-| S7 | Implement NSIM payment client | NSIM API contract |
-| S8 | Pass agentContext to NSIM in authorization request | Q10, Q11 resolved |
-| S9 | Handle authorization response (approve/decline/step-up) | - |
-| S10 | Link order to payment reference (authorizationId) | - |
-| S11 | Implement capture on order fulfillment | - |
-
-**Proposed API Call (SSIM → NSIM)**:
-```typescript
-// When agent completes checkout with payment token
-const authResult = await nsimClient.authorize({
-  amount: session.total,
-  currency: 'CAD',
-  merchantId: store.merchantId,
-  paymentToken: paymentToken,  // From WSIM
-  agentContext: {
-    agentId: tokenInfo.agent_id,
-    ownerId: tokenInfo.owner_id,
-    humanPresent: tokenInfo.human_present,
-    mandateId: tokenInfo.mandate_id,
-    mandateType: 'cart'
-  }
-});
-
-if (authResult.status === 'approved') {
-  // Create order with payment reference
-  order.paymentAuthorizationId = authResult.authorizationId;
-  order.status = 'confirmed';
-}
-```
-
-**Questions for Teams**:
-
-1. **SSIM Team**:
-   - Does the proposed task breakdown look correct?
-   - Any concerns about the integration approach?
-   - Estimated effort for S7-S11?
-
-2. **NSIM Team**:
-   - Confirm the authorization API contract for agent transactions
-   - Any additional fields needed in agentContext?
-   - Webhook events SSIM should listen for?
-
-3. **BSIM Team**:
-   - Confirm you'll receive agentContext from NSIM per Q11 resolution
-   - Any changes needed to support the flow?
-   - Verification approach for owner matching (Q14)?
-
 **Discussion**:
 - 2026-01-22 PM: Identified gap during Sprint 1 review. This is the critical path for MVP.
 - 2026-01-22 NSIM Team: **Clarification needed on scope of "gap".**
@@ -973,24 +923,271 @@ if (authResult.status === 'approved') {
   The framing of Q29 assumes SSIM needs to implement payment processing from scratch. However:
 
   1. **Does SSIM already call NSIM for human checkout?**
-     - If a human customer completes checkout on SSIM today, does that flow already call NSIM `/authorize` → BSIM?
-     - Or is SSIM using some other payment mechanism (mock payments, direct BSIM, etc.)?
-
-  2. **If SSIM already has payment processing:**
-     - The Sprint 2 work may be significantly simpler than proposed
-     - The agent checkout flow just needs to call the *existing* payment service with `agentContext` added
-     - Tasks S7-S11 may reduce to: "Wire agent checkout to existing payment flow + add agentContext"
-
+  2. **If SSIM already has payment processing**, the Sprint 2 work may be significantly simpler
   3. **What we already have:**
      - NSIM v1.2.0 already accepts `agentContext` in authorization requests ✅
      - NSIM v1.2.0 already forwards `agentContext` to BSIM ✅
      - BSIM v0.8.0 already accepts and stores `agentContext` ✅
-     - The only missing piece is SSIM passing `agentContext` through its payment call
 
-  **Key Question for SSIM Team:**
-  What is SSIM's current payment flow for human customers? Does it already integrate with NSIM?
+- 2026-01-22 SSIM Team: **✅ CONFIRMED - SSIM already has complete NSIM integration!**
 
-*Awaiting SSIM team response on existing payment integration...*
+  After code review, SSIM has a fully functional payment processing layer:
+
+  **Existing NSIM Client** (`src/services/payment.ts`):
+  ```typescript
+  // Already implemented functions:
+  authorizePayment(params)   // POST /api/v1/payments/authorize
+  capturePayment(id, amount) // POST /api/v1/payments/{id}/capture
+  voidPayment(id)            // POST /api/v1/payments/{id}/void
+  refundPayment(id, amount)  // POST /api/v1/payments/{id}/refund
+  getPaymentStatus(id)       // GET /api/v1/payments/{id}
+  registerWebhook(params)    // POST /api/v1/webhooks
+  ```
+
+  **Existing Payment Flows** (`src/routes/payment.ts`):
+  | Flow | Location | Calls NSIM? |
+  |------|----------|-------------|
+  | Bank payment (BSIM OAuth callback) | Lines 321-329 | ✅ Yes |
+  | Wallet redirect (WSIM OAuth callback) | Lines 501-510 | ✅ Yes |
+  | Popup wallet payment | Lines 599-607 | ✅ Yes |
+  | Mobile wallet (mwsim) | Lines 1244-1253 | ✅ Yes |
+
+  **Current AuthorizeParams interface**:
+  ```typescript
+  interface AuthorizeParams {
+    merchantId: string;
+    amount: number;
+    currency: string;
+    cardToken: string;
+    walletCardToken?: string;  // For wallet routing
+    orderId: string;
+    // Missing: agentContext ← This is all we need to add!
+  }
+  ```
+
+**Resolution**:
+✅ **RESOLVED**: SSIM already has complete NSIM payment integration.
+
+**Revised Sprint 2 Scope** (significantly reduced):
+
+| Task | Description | Effort |
+|------|-------------|--------|
+| ~~S7~~ | ~~Implement NSIM payment client~~ | N/A - Already exists! |
+| S8 | Add `agentContext` to `AuthorizeParams` interface | 0.5 day |
+| S8b | Pass agentContext from agent checkout to `authorizePayment()` | 0.5 day |
+| S9 | Test authorize/decline flow with agentContext | 1 day |
+| ~~S10~~ | ~~Link order to payment reference~~ | N/A - Already done! |
+| ~~S11~~ | ~~Implement capture~~ | N/A - Already exists! |
+
+**Sprint 2 Effort**: ~2 days (down from original ~5-7 days estimate)
+
+**Implementation Plan**:
+```typescript
+// src/services/payment.ts - Add agentContext to interface
+interface AuthorizeParams {
+  merchantId: string;
+  amount: number;
+  currency: string;
+  cardToken: string;
+  walletCardToken?: string;
+  orderId: string;
+  agentContext?: {           // NEW
+    agentId: string;
+    ownerId: string;
+    humanPresent: boolean;
+    mandateId?: string;
+    mandateType?: string;
+  };
+}
+
+// src/routes/agent-api.ts - Pass context when authorizing
+const authResult = await authorizePayment({
+  merchantId: config.merchantId,
+  amount: session.cart.total,
+  currency: 'CAD',
+  cardToken: paymentToken,
+  orderId: order.id,
+  agentContext: {
+    agentId: tokenInfo.agent_id,
+    ownerId: tokenInfo.owner_id,
+    humanPresent: tokenInfo.human_present || false,
+    mandateId: tokenInfo.mandate_id,
+    mandateType: 'cart'
+  }
+});
+```
+
+**Resolved by**: SSIM Team | **Date**: 2026-01-22
+
+---
+
+### Q30: Agent payment token missing BSIM card_token
+**Asked by**: DevOps (Log Analysis)
+**Date**: 2026-01-22
+**Status**: 🔴 Open - Awaiting WSIM + SSIM Team Response
+**Priority**: **Critical** - Blocking agent payment processing
+
+**Question**:
+Agent payments are failing with "Invalid card token" errors. The WSIM agent payment token only includes `wallet_card_token` but not `card_token`. How should this be fixed?
+
+**Context**:
+During integration testing, all agent payment attempts fail at the BSIM authorization step.
+
+**Error Symptoms** (from dev logs):
+```
+SSIM: [PaymentService] Payment declined: { status: 'declined', declineReason: 'Invalid card token' }
+BSIM: [SimNetHandler] JWT verification failed: invalid signature
+BSIM: [SimNetHandler] No consent found for token: eyJhbGci...
+```
+
+**Root Cause Analysis**:
+
+| Step | Human Wallet Flow | Agent Payment Flow |
+|------|-------------------|-------------------|
+| 1. Select card | OAuth consent in WSIM | Pre-registered in WSIM |
+| 2. Get BSIM card token | ✅ WSIM calls BSIM `/api/wallet/tokens` | ❌ **Missing** |
+| 3. Include in JWT | `wallet_card_token` + `card_token` | `wallet_card_token` only |
+| 4. SSIM extracts | Both tokens | Only gets `wallet_card_token` |
+| 5. BSIM authorizes | Uses `card_token` | ❌ **Fails - no valid token** |
+
+**Current Code (WSIM agent-payments.ts:264-281)**:
+```typescript
+// Generate payment token - MISSING card_token!
+const paymentToken = jwt.sign(
+  {
+    payment_id: transaction.id,
+    agent_id: agent.id,
+    owner_id: agent.userId,
+    merchant_id,
+    amount: amountDecimal.toString(),
+    currency,
+    payment_method_id: paymentMethod.id,
+    wallet_card_token: paymentMethod.walletCardToken,  // ← Only this
+    // card_token: ???  ← MISSING - need BSIM card token here
+  },
+  env.PAYMENT_TOKEN_SECRET,
+  { expiresIn: env.PAYMENT_TOKEN_EXPIRY, issuer: env.APP_URL }
+);
+```
+
+**Reference - Human Wallet Flow (WSIM payment.ts:90-130)**:
+The human flow correctly requests a card token from BSIM:
+```typescript
+// Request card token from BSIM
+const bsimResponse = await fetch(`${apiUrl}/api/wallet/tokens`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${walletCredential}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    cardId: card.bsimCardRef,
+    merchantId,
+    amount,
+    currency: currency || 'CAD',
+  }),
+});
+```
+
+**Proposed Fix - WSIM Team**:
+
+1. Modify wallet card query to include enrollment (for wallet credential):
+```typescript
+const agent = await prisma.agent.findUnique({
+  where: { id: agentPayload!.sub },
+  include: {
+    user: {
+      include: {
+        walletCards: {
+          where: { isActive: true },
+          orderBy: { isDefault: 'desc' },
+          include: { enrollment: true },  // ← ADD THIS
+        },
+      },
+    },
+  },
+});
+```
+
+2. Before generating JWT, request card token from BSIM (same pattern as payment.ts):
+```typescript
+// Get card token from BSIM
+const bsimCardToken = await requestBsimCardToken(
+  paymentMethod,
+  merchant_id,
+  amountDecimal,
+  currency
+);
+```
+
+3. Include `card_token` in JWT payload:
+```typescript
+wallet_card_token: paymentMethod.walletCardToken,
+card_token: bsimCardToken,  // ← ADD THIS
+```
+
+**Proposed Fix - SSIM Team**:
+
+Update `agent-api.ts:728` to decode JWT and extract both tokens (same pattern as payment.ts:448-468):
+```typescript
+// Decode WSIM payment token JWT
+let walletCardToken: string | undefined;
+let cardToken: string | undefined;
+
+if (finalPaymentToken.split('.').length === 3) {
+  const payload = JSON.parse(
+    Buffer.from(finalPaymentToken.split('.')[1], 'base64').toString()
+  );
+  walletCardToken = payload.wallet_card_token;
+  cardToken = payload.card_token;
+}
+
+// Pass both tokens to authorizePayment
+const authResult = await authorizePayment({
+  merchantId: config.merchantId,
+  amount: cart.total / 100,
+  currency: cart.currency,
+  cardToken,           // ← Use extracted card_token
+  walletCardToken,     // ← Use extracted wallet_card_token
+  orderId: order.id,
+  agentContext,
+});
+```
+
+**Discussion**:
+- 2026-01-22 DevOps: Issue discovered during integration testing. All agent payments failing.
+- 2026-01-22 DevOps: Root cause identified - WSIM agent flow doesn't request BSIM card token like human flow does.
+- 2026-01-22 WSIM Team (Claude): **✅ SUPPORT - Analysis confirmed, will implement fix.**
+
+  **Root cause verified**: Looking at `agent-payments.ts:264-281`, the JWT payload only includes `wallet_card_token`. The human flow at `payment.ts:99-111` correctly calls BSIM's `/api/wallet/tokens` endpoint.
+
+  **Response to Q1 (BSIM call for every payment token)**:
+  - Yes, this is correct and necessary. BSIM card tokens are short-lived (scoped to merchant/amount).
+  - The human flow already does this for every payment - same pattern.
+  - No caching concern - tokens should be fresh per transaction.
+
+  **Response to Q3 (Security implications)**:
+  - The wallet credential (for calling BSIM) is stored encrypted in `BsimEnrollment.walletCredential`
+  - We need to include `enrollment` in the query to access it
+  - The BSIM card token is merchant/amount-scoped, so it can't be reused maliciously
+
+  **Implementation notes**:
+  1. Need to add `include: { enrollment: true }` to the walletCards query
+  2. Reuse the existing `getBsimProviders()` and `getBsimApiUrl()` helpers from `payment.ts`
+  3. Call BSIM `/api/wallet/tokens` with: `cardId`, `merchantId`, `amount`, `currency`
+  4. Add `card_token` to the JWT payload alongside `wallet_card_token`
+
+  **Also affects step-up flow**: The same issue exists at `agent-payments.ts:373-389` where payment tokens are generated after step-up approval. Both locations need the fix.
+
+  **Estimated effort**: ~2 hours for WSIM changes.
+
+**Questions for Teams**:
+1. **WSIM Team**: Is the proposed fix correct? Any concerns with calling BSIM for every agent payment token?
+2. **SSIM Team**: Should SSIM verify the JWT signature, or just decode it (like human flow does)?
+3. **Both**: Any security implications we should consider?
+
+**Resolution**:
+*Pending SSIM team response on Q2, then WSIM will implement*
 
 ---
 
@@ -1034,6 +1231,7 @@ if (authResult.status === 'approved') {
 | 2026-01-21 | Q26: Client-side Message Center for Phase 1 | Defer WSIM aggregation complexity | WSIM + mwsim |
 | 2026-01-21 | Q27: 30-day message retention | Balance storage with user access | WSIM |
 | 2026-01-21 | Q28: Agent-initiated credential flow approved | Security improvement - credentials never displayed | WSIM + mwsim |
+| 2026-01-22 | Q29: SSIM already has NSIM integration - add agentContext only | Existing payment.ts client handles all flows; Sprint 2 reduced to ~2 days | SSIM |
 
 ---
 

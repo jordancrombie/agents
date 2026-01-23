@@ -2,7 +2,7 @@
 
 **Project**: SimToolBox Agent Commerce Protocol (SACP)
 **Project Manager**: [TBD]
-**Last Updated**: 2026-01-22 (Sprint 2 Planning - Payment Integration Gap Identified)
+**Last Updated**: 2026-01-23 (Q30 Opened - Agent payment token missing card_token)
 
 ---
 
@@ -10,12 +10,24 @@
 
 | Metric | Status |
 |--------|--------|
-| Overall Project Health | :yellow_circle: **Sprint 2 Planning - Payment Integration Required** |
+| Overall Project Health | :red_circle: **BLOCKED - Q30 Open** |
 | Design Sign-Off | **4 / 4 signed** ✅ (SSIM, WSIM, NSIM, BSIM) |
-| Implementation Progress | **WSIM v1.0.5 + SSIM v2.0.5 + NSIM v1.2.0 + BSIM v0.8.0 + mwsim P0 Complete** |
+| Implementation Progress | **WSIM v1.0.5 + SSIM v2.1.0 + NSIM v1.2.0 + BSIM v0.8.0 + mwsim P0 Complete** |
 | Dev Deployment | ✅ **ALL SERVICES DEPLOYED** (SSIM, BSIM, NewBank, WSIM, NSIM) |
-| Integration Testing | ✅ **ALL QA TESTS PASSING** (Sprint 1 complete) |
+| Integration Testing | 🔴 **BLOCKED** - Agent payments failing (Q30) |
 | Target Launch | TBD |
+
+### 🚨 Current Blocker: Q30
+
+**Issue**: Agent payment tokens from WSIM only include `wallet_card_token` but not `card_token`. BSIM cannot authorize payments.
+
+**Impact**: All agent payment attempts fail with "Invalid card token"
+
+**Action Required**:
+- WSIM Team: Add BSIM card token request to agent payment flow
+- SSIM Team: Extract both tokens from JWT and pass to NSIM
+
+**See**: [Q30 in PROJECT_QA.md](PROJECT_QA.md#q30-agent-payment-token-missing-bsim-card_token)
 
 ---
 
@@ -74,7 +86,7 @@
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: 6-8 weeks confirmed |
 | **Design Sign-Off** | ✅ **SIGNED OFF** |
-| **Implementation Status** | ✅ **v2.0.5 COMPLETE** |
+| **Implementation Status** | ✅ **v2.1.0 COMPLETE** |
 | **Dev Deployment** | ✅ **DEPLOYED** (DB migrated, pipeline updated from `feature/agentic-support`) |
 | **Integration Testing** | ✅ **ALL TESTS PASSING** |
 
@@ -417,54 +429,57 @@
 
 ---
 
-## Sprint 2 - Payment Processing Integration (PROPOSED)
+## Sprint 2 - Payment Processing Integration
 
-**Sprint Start**: TBD (Pending team review of Q29)
-**Sprint Goal**: Implement real payment processing flow - SSIM → NSIM → BSIM
+**Sprint Start**: TBD
+**Sprint Goal**: Wire agent checkout to existing NSIM payment flow with agentContext
 
-### 🔴 CRITICAL GAP IDENTIFIED
+### ✅ Q29 RESOLVED - Integration Already Exists
 
-**Issue**: SSIM currently validates payment tokens and creates orders, but does NOT call NSIM to actually process payments.
+**Finding**: SSIM already has complete NSIM payment integration for human checkout!
 
-**Current Flow** (incomplete):
-```
-Agent → SSIM → Creates order (no actual payment) ❌
-```
+**Existing Payment Service** (`src/services/payment.ts`):
+- `authorizePayment()` - Already calls NSIM `/api/v1/payments/authorize`
+- `capturePayment()` - Already calls NSIM capture
+- `voidPayment()`, `refundPayment()` - Already implemented
 
-**Required Flow**:
-```
-Agent → SSIM → NSIM → BSIM → Real payment authorization ✅
-```
+**Existing Payment Flows** (`src/routes/payment.ts`):
+- Bank payment (BSIM OAuth) → NSIM ✅
+- Wallet redirect (WSIM OAuth) → NSIM ✅
+- Popup wallet payment → NSIM ✅
+- Mobile wallet (mwsim) → NSIM ✅
 
-**Impact**: Without this integration:
-- No real money flows through the system
-- BSIM won't show agent badges on real transactions
-- Integration tests (Flows 2, 3, 7, 10) cannot fully validate
+**Sprint 2 Scope (Significantly Reduced)**:
+- Only need to add `agentContext` to `AuthorizeParams` interface
+- Pass agentContext from agent checkout to existing `authorizePayment()` function
 
-**See Q29 in [PROJECT_QA.md](PROJECT_QA.md) for team discussion.**
+**Estimated Effort**: ~2 days (down from original 5-7 days)
+
+**See Q29 in [PROJECT_QA.md](PROJECT_QA.md) for full resolution.**
 
 ### SSIM Team (Sprint 2)
 
 | # | Task | Priority | Status | Notes |
 |---|------|----------|--------|-------|
-| S7 | Implement NSIM payment client | P0 | :white_circle: Not Started | New `src/services/nsim-client.ts` |
-| S8 | Pass agentContext to NSIM | P0 | :white_circle: Not Started | Per Q10, Q11 resolution |
-| S9 | Handle authorization response | P0 | :white_circle: Not Started | Approve/decline/step-up |
-| S10 | Link order to payment reference | P0 | :white_circle: Not Started | Store `authorizationId` on order |
-| S11 | Implement capture on fulfillment | P1 | :white_circle: Not Started | Call NSIM capture when order ships |
+| ~~S7~~ | ~~Implement NSIM payment client~~ | N/A | ✅ **Already Exists** | `src/services/payment.ts` |
+| S8 | Add `agentContext` to `AuthorizeParams` | P0 | ✅ **Complete** | v2.1.0 - Interface + body param |
+| S8b | Pass agentContext from agent checkout | P0 | ✅ **Complete** | v2.1.0 - Wired in agent-api.ts |
+| S9 | Test authorize/decline with agentContext | P0 | :white_circle: Not Started | Integration test pending |
+| ~~S10~~ | ~~Link order to payment reference~~ | N/A | ✅ **Already Done** | Orders already have `transactionId` |
+| ~~S11~~ | ~~Implement capture on fulfillment~~ | N/A | ✅ **Already Exists** | `capturePayment()` exists |
 
 ### NSIM Team (Sprint 2)
 
 | # | Task | Priority | Status | Notes |
 |---|------|----------|--------|-------|
-| N4 | Confirm authorization API contract | P0 | :white_circle: Awaiting Response | Review Q29 and confirm |
-| N5 | Validate agentContext fields | P0 | :white_circle: Not Started | Already implemented in v1.2.0 |
+| N4 | Confirm authorization API contract | P0 | ✅ **Confirmed** | NSIM v1.2.0 accepts agentContext |
+| N5 | Validate agentContext fields | P0 | ✅ **Already Done** | NSIM v1.2.0 complete |
 
 ### BSIM Team (Sprint 2)
 
 | # | Task | Priority | Status | Notes |
 |---|------|----------|--------|-------|
-| B4 | Confirm agentContext receipt from NSIM | P0 | :white_circle: Awaiting Response | Review Q29 and confirm |
+| B4 | Confirm agentContext receipt from NSIM | P0 | ✅ **Confirmed** | BSIM v0.8.0 ready |
 | B5 | Test owner verification (Q14) | P1 | :white_circle: Not Started | BsimEnrollment lookup |
 
 ### mwsim Team (Sprint 2)
@@ -592,8 +607,8 @@ Date: _______________
 | A16 | WSIM token revocation webhooks (v1.0.5) | WSIM | 2026-01-22 | ✅ **Complete** |
 | A17 | Clear dev environment for Phase 2 | DevOps | 2026-01-22 | ✅ **Complete** |
 | A18 | Phase 2 planning | PM | TBD | :yellow_circle: **In Progress** |
-| A19 | Review Q29 payment processing integration | SSIM, NSIM, BSIM | TBD | :white_circle: Awaiting Response |
-| A20 | Sprint 2 kickoff | PM | TBD | :white_circle: Blocked by A19 |
+| A19 | Review Q29 payment processing integration | SSIM, NSIM, BSIM | 2026-01-22 | ✅ **Resolved** - SSIM already has NSIM integration |
+| A20 | Sprint 2 kickoff | PM | TBD | :white_circle: Ready to Start |
 
 ---
 
@@ -634,6 +649,9 @@ Date: _______________
 | 3.2 | 2026-01-22 | WSIM Team | **WSIM v1.0.5 WEBHOOK SYSTEM** - Token revocation webhooks for SSIM. MerchantWebhook model, HMAC-SHA256 signatures, dispatch on revoke/delete/rotate. |
 | 3.3 | 2026-01-22 | QA | **ALL QA TESTS PASSING** - Sprint 1 complete. Dev environment cleared. Ready for Phase 2. |
 | 3.4 | 2026-01-22 | PM | **SPRINT 2 PLANNING** - Identified critical gap: SSIM not processing payments via NSIM. Added Q29 for team review. Sprint 2 tasks proposed. |
+| 3.5 | 2026-01-22 | SSIM Team | **Q29 RESOLVED** - SSIM already has complete NSIM payment integration (`src/services/payment.ts`). Sprint 2 scope reduced to ~2 days (add agentContext to existing flow). |
+| 3.6 | 2026-01-22 | SSIM Team | **SSIM v2.1.0 SPRINT 2 COMPLETE** - Added agentContext to payment authorization. Agent checkouts now process through NSIM → BSIM. 🤖 Agent badges visible in BSIM. |
+| 3.7 | 2026-01-23 | DevOps | **Q30 OPENED - CRITICAL BLOCKER** - Agent payments failing. WSIM payment token missing `card_token`. WSIM+SSIM code changes required. See PROJECT_QA.md for details. |
 
 ---
 
@@ -685,8 +703,8 @@ Date: _______________
 
 | Service | Health Endpoint | Status | Version |
 |---------|-----------------|--------|---------|
-| **SSIM** | ssim-dev.banksim.ca/health | ✅ Healthy | v2.0.5 |
-| **Regalmoose** | regalmoose.ca/health | ✅ Healthy | v2.0.5 |
+| **SSIM** | ssim-dev.banksim.ca/health | ✅ Healthy | v2.1.0 |
+| **Regalmoose** | regalmoose.ca/health | ✅ Healthy | v2.1.0 |
 | **BSIM** | dev.banksim.ca/api/health | ✅ Healthy | v0.8.0 |
 | **NewBank** | newbank-dev.banksim.ca/health | ✅ Healthy | - |
 | **WSIM** | wsim-dev.banksim.ca/api/health | ✅ Healthy | v1.0.5 |
@@ -744,7 +762,7 @@ curl -sk https://ssim-dev.banksim.ca/.well-known/ucp
 | Team | Estimated Effort | Actual | Dependencies | Status |
 |------|------------------|--------|--------------|--------|
 | WSIM | 6-8 weeks | **2 days** | None | ✅ **v1.0.5 Complete** (incl. QA fixes + webhooks) |
-| SSIM | 6-8 weeks | **2 days** | WSIM OAuth | ✅ **v2.0.5 Complete** (incl. bug fixes) |
+| SSIM | 6-8 weeks | **2 days** | WSIM OAuth | ✅ **v2.1.0 Complete** (Sprint 1+2) |
 | NSIM | 2 weeks | **1 day** | SSIM checkout | ✅ **v1.2.0 Complete** (P0+P1) |
 | BSIM | 1.5-2 weeks | **1 day** | NSIM context | ✅ **v0.8.0 Complete** |
 | mwsim | 3-4 weeks | **1 day** | WSIM APIs | ✅ **P0 Complete** |
