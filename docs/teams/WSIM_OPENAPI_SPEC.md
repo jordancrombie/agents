@@ -3,7 +3,21 @@
 **For**: WSIM Team
 **Date**: 2026-01-22
 **Priority**: P1
-**Status**: Ready for Implementation
+**Status**: ✅ **COMPLETE** (v1.0.7)
+
+---
+
+## Implementation Status
+
+| Endpoint | Status | Notes |
+|----------|--------|-------|
+| `/.well-known/openapi.json` | ✅ Complete | Serves OpenAPI 3.0 spec from `docs/sacp/openapi-agent.yaml` |
+| `/.well-known/agent-api` | ✅ Complete | Agent discovery document with registration, OAuth, and API info |
+| `/.well-known/oauth-authorization-server` | ✅ Complete | RFC 8414 OAuth metadata |
+
+**Implementation**: See [well-known.ts](https://github.com/jordancrombie/wsim/blob/agentic-support/backend/src/routes/well-known.ts)
+
+**Authoritative Spec**: The actual OpenAPI specification is at `docs/sacp/openapi-agent.yaml`. The spec below is an earlier draft and may not match the implementation.
 
 ---
 

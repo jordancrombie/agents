@@ -12,7 +12,7 @@
 |--------|--------|
 | Overall Project Health | :green_circle: **ON TRACK** |
 | Design Sign-Off | **4 / 4 signed** ✅ (SSIM, WSIM, NSIM, BSIM) |
-| Implementation Progress | **WSIM v1.0.6 + SSIM v2.1.1 + NSIM v1.2.0 + BSIM v0.8.0 + mwsim P0 Complete** |
+| Implementation Progress | **WSIM v1.0.7 + SSIM v2.1.1 + NSIM v1.2.0 + BSIM v0.8.0 + mwsim P0 Complete** |
 | Dev Deployment | ✅ **ALL SERVICES DEPLOYED** (SSIM, BSIM, NewBank, WSIM, NSIM) |
 | Integration Testing | ✅ **ALL TESTS PASSING** |
 | Target Launch | TBD |
@@ -147,7 +147,7 @@
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~6-8 weeks confirmed |
 | **Design Sign-Off** | ✅ **SIGNED OFF** |
-| **Implementation Status** | ✅ **v1.0.6 COMPLETE** |
+| **Implementation Status** | ✅ **v1.0.7 COMPLETE** |
 | **Dev Deployment** | ✅ **DEPLOYED** (from `agentic-support` branch) |
 | **Integration Testing** | ✅ **ALL QA TESTS PASSING** |
 
@@ -655,6 +655,7 @@ Date: _______________
 | 3.8 | 2026-01-22 | SSIM Team | **SSIM v2.1.1 Q30 FIX IMPLEMENTED** - Extract `card_token` from WSIM JWT. Graceful error when token missing. |
 | 3.9 | 2026-01-22 | WSIM Team | **WSIM v1.0.6 Q30 FIX IMPLEMENTED** - Added `card_token` to payment JWT. Requests BSIM card token before generating JWT (same pattern as human flow). Q30 fully resolved. |
 | 4.0 | 2026-01-22 | QA | **🎉 AGENT PAYMENTS WORKING IN DEV** - End-to-end agent payment flow verified. Transactions processing through full stack: Agent → SSIM → NSIM → BSIM. Agent badges visible in BSIM transaction history. Sprint 2 complete! |
+| 4.1 | 2026-01-22 | WSIM Team | **WSIM v1.0.7 DISCOVERY ENDPOINTS** - Added `/.well-known/openapi.json`, `/.well-known/agent-api`, `/.well-known/oauth-authorization-server`. External AI agents can now programmatically discover WSIM capabilities. |
 
 ---
 
@@ -710,7 +711,7 @@ Date: _______________
 | **Regalmoose** | regalmoose.ca/health | ✅ Healthy | v2.1.1 |
 | **BSIM** | dev.banksim.ca/api/health | ✅ Healthy | v0.8.0 |
 | **NewBank** | newbank-dev.banksim.ca/health | ✅ Healthy | - |
-| **WSIM** | wsim-dev.banksim.ca/api/health | ✅ Healthy | v1.0.6 |
+| **WSIM** | wsim-dev.banksim.ca/api/health | ✅ Healthy | v1.0.7 |
 | **NSIM** | payment-dev.banksim.ca/health | ✅ Healthy | - |
 
 ### Integration Test Results (2026-01-22)
@@ -764,7 +765,7 @@ curl -sk https://ssim-dev.banksim.ca/.well-known/ucp
 
 | Team | Estimated Effort | Actual | Dependencies | Status |
 |------|------------------|--------|--------------|--------|
-| WSIM | 6-8 weeks | **2 days** | None | ✅ **v1.0.6 Complete** (incl. QA fixes + webhooks + Q30 fix) |
+| WSIM | 6-8 weeks | **2 days** | None | ✅ **v1.0.7 Complete** (incl. QA fixes + webhooks + Q30 fix + discovery) |
 | SSIM | 6-8 weeks | **2 days** | WSIM OAuth | ✅ **v2.1.1 Complete** (Sprint 1+2+Q30) |
 | NSIM | 2 weeks | **1 day** | SSIM checkout | ✅ **v1.2.0 Complete** (P0+P1) |
 | BSIM | 1.5-2 weeks | **1 day** | NSIM context | ✅ **v0.8.0 Complete** |
