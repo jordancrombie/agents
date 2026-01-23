@@ -67,7 +67,7 @@ This document tracks questions raised by teams during design review and implemen
 | Q27 | mwsim | Message retention policy | ✅ Resolved | Low |
 | Q28 | Cross-Team | Agent-initiated credential flow | ✅ Resolved | **High** |
 | Q29 | Cross-Team | SSIM → NSIM payment processing integration | ✅ Resolved | **Critical** |
-| Q30 | Cross-Team | Agent payment token missing BSIM card_token | ✅ Resolved | **Critical** |
+| Q30 | Cross-Team | Agent payment token missing BSIM card_token | ✅ Resolved (Verified) | **Critical** |
 
 ---
 
@@ -1024,7 +1024,7 @@ const authResult = await authorizePayment({
 ### Q30: Agent payment token missing BSIM card_token
 **Asked by**: DevOps (Log Analysis)
 **Date**: 2026-01-22
-**Status**: 🟡 Partially Resolved - SSIM v2.1.1 complete, awaiting WSIM v1.0.6
+**Status**: ✅ Resolved - Transactions verified working in dev
 **Priority**: **Critical** - Blocking agent payment processing
 
 **Question**:
@@ -1256,6 +1256,8 @@ const authResult = await authorizePayment({
 
 **Deployment Order**: WSIM first, then SSIM (SSIM has graceful fallback)
 
+**Verification**: ✅ Agent payment transactions confirmed processing in dev environment. Full flow verified: Agent → SSIM → NSIM → BSIM. Agent badges visible in BSIM transaction history.
+
 **Resolved by**: WSIM + SSIM Teams | **Date**: 2026-01-22
 
 ---
@@ -1301,6 +1303,7 @@ const authResult = await authorizePayment({
 | 2026-01-21 | Q27: 30-day message retention | Balance storage with user access | WSIM |
 | 2026-01-21 | Q28: Agent-initiated credential flow approved | Security improvement - credentials never displayed | WSIM + mwsim |
 | 2026-01-22 | Q29: SSIM already has NSIM integration - add agentContext only | Existing payment.ts client handles all flows; Sprint 2 reduced to ~2 days | SSIM |
+| 2026-01-22 | Q30: WSIM must request BSIM card_token for agent payments | Agent flow must match human flow for BSIM authorization | WSIM + SSIM |
 
 ---
 

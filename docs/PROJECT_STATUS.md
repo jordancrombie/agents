@@ -2,7 +2,7 @@
 
 **Project**: SimToolBox Agent Commerce Protocol (SACP)
 **Project Manager**: [TBD]
-**Last Updated**: 2026-01-22 (Q30 Resolved - Agent payment token now includes card_token)
+**Last Updated**: 2026-01-22 (Agent payments verified working in dev environment)
 
 ---
 
@@ -464,7 +464,7 @@
 | ~~S7~~ | ~~Implement NSIM payment client~~ | N/A | ✅ **Already Exists** | `src/services/payment.ts` |
 | S8 | Add `agentContext` to `AuthorizeParams` | P0 | ✅ **Complete** | v2.1.0 - Interface + body param |
 | S8b | Pass agentContext from agent checkout | P0 | ✅ **Complete** | v2.1.0 - Wired in agent-api.ts |
-| S9 | Test authorize/decline with agentContext | P0 | :white_circle: Not Started | Integration test pending |
+| S9 | Test authorize/decline with agentContext | P0 | ✅ **Complete** | Transactions verified in dev |
 | ~~S10~~ | ~~Link order to payment reference~~ | N/A | ✅ **Already Done** | Orders already have `transactionId` |
 | ~~S11~~ | ~~Implement capture on fulfillment~~ | N/A | ✅ **Already Exists** | `capturePayment()` exists |
 
@@ -654,6 +654,7 @@ Date: _______________
 | 3.7 | 2026-01-23 | DevOps | **Q30 OPENED - CRITICAL BLOCKER** - Agent payments failing. WSIM payment token missing `card_token`. WSIM+SSIM code changes required. See PROJECT_QA.md for details. |
 | 3.8 | 2026-01-22 | SSIM Team | **SSIM v2.1.1 Q30 FIX IMPLEMENTED** - Extract `card_token` from WSIM JWT. Graceful error when token missing. |
 | 3.9 | 2026-01-22 | WSIM Team | **WSIM v1.0.6 Q30 FIX IMPLEMENTED** - Added `card_token` to payment JWT. Requests BSIM card token before generating JWT (same pattern as human flow). Q30 fully resolved. |
+| 4.0 | 2026-01-22 | QA | **🎉 AGENT PAYMENTS WORKING IN DEV** - End-to-end agent payment flow verified. Transactions processing through full stack: Agent → SSIM → NSIM → BSIM. Agent badges visible in BSIM transaction history. Sprint 2 complete! |
 
 ---
 
@@ -709,7 +710,7 @@ Date: _______________
 | **Regalmoose** | regalmoose.ca/health | ✅ Healthy | v2.1.1 |
 | **BSIM** | dev.banksim.ca/api/health | ✅ Healthy | v0.8.0 |
 | **NewBank** | newbank-dev.banksim.ca/health | ✅ Healthy | - |
-| **WSIM** | wsim-dev.banksim.ca/api/health | ✅ Healthy | v1.0.5 |
+| **WSIM** | wsim-dev.banksim.ca/api/health | ✅ Healthy | v1.0.6 |
 | **NSIM** | payment-dev.banksim.ca/health | ✅ Healthy | - |
 
 ### Integration Test Results (2026-01-22)
