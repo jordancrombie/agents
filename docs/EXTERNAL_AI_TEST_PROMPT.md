@@ -3,7 +3,7 @@
 **Purpose**: Test the SACP protocol with an external AI (Gemini, ChatGPT, etc.)
 **Date**: 2026-01-23
 **Prerequisites**:
-- Dev environment deployed (SSIM v2.2.0, WSIM v1.0.7)
+- Production environment (SSIM v2.2.0, WSIM v1.0.7)
 - Access to mwsim app to generate pairing code
 
 ---
@@ -27,7 +27,7 @@ You are an AI shopping assistant. Your task is to discover a store, browse produ
 
 Begin by discovering the store capabilities:
 
-GET https://ssim-dev.banksim.ca/.well-known/ucp
+GET https://ssim.banksim.ca/.well-known/ucp
 
 This will return the store's UCP (Universal Commerce Protocol) document containing:
 - Merchant information
@@ -42,7 +42,7 @@ Call the UCP endpoint above. Note the `wallet_provider` section - this tells you
 ### 2. Discover the Wallet Provider
 The UCP response will include a wallet provider URL. Call:
 
-GET https://wsim-dev.banksim.ca/.well-known/agent-api
+GET https://wsim.banksim.ca/.well-known/agent-api
 
 This tells you how to register and authenticate.
 
@@ -51,7 +51,7 @@ Before you can make purchases, you need credentials. I will generate a pairing c
 
 When I give you the code, call:
 
-POST https://wsim-dev.banksim.ca/api/agent/v1/access-request
+POST https://wsim.banksim.ca/api/agent/v1/access-request
 Content-Type: application/json
 
 {
@@ -62,14 +62,14 @@ Content-Type: application/json
 
 Then poll for approval status until I approve on my phone:
 
-GET https://wsim-dev.banksim.ca/api/agent/v1/access-request/<request_id>/status
+GET https://wsim.banksim.ca/api/agent/v1/access-request/<request_id>/status
 
 Once approved, you'll receive `client_id` and `client_secret`.
 
 ### 4. Get Access Token
 Exchange your credentials for an access token:
 
-POST https://wsim-dev.banksim.ca/api/agent/v1/oauth/token
+POST https://wsim.banksim.ca/api/agent/v1/oauth/token
 Content-Type: application/x-www-form-urlencoded
 
 grant_type=client_credentials&client_id=<YOUR_CLIENT_ID>&client_secret=<YOUR_CLIENT_SECRET>
@@ -77,12 +77,12 @@ grant_type=client_credentials&client_id=<YOUR_CLIENT_ID>&client_secret=<YOUR_CLI
 ### 5. Browse Products
 Use your access token to browse the store:
 
-GET https://ssim-dev.banksim.ca/api/agent/v1/products
+GET https://ssim.banksim.ca/api/agent/v1/products
 Authorization: Bearer <ACCESS_TOKEN>
 
 Or search:
 
-GET https://ssim-dev.banksim.ca/api/agent/v1/products/search?q=coffee
+GET https://ssim.banksim.ca/api/agent/v1/products/search?q=coffee
 Authorization: Bearer <ACCESS_TOKEN>
 
 Show me what's available and let me choose what to buy.
@@ -90,7 +90,7 @@ Show me what's available and let me choose what to buy.
 ### 6. Create Checkout
 When I select a product:
 
-POST https://ssim-dev.banksim.ca/api/agent/v1/sessions
+POST https://ssim.banksim.ca/api/agent/v1/sessions
 Authorization: Bearer <ACCESS_TOKEN>
 Content-Type: application/json
 
@@ -103,7 +103,7 @@ Content-Type: application/json
 ### 7. Get Payment Token
 Request payment authorization from the wallet:
 
-POST https://wsim-dev.banksim.ca/api/agent/v1/payments/token
+POST https://wsim.banksim.ca/api/agent/v1/payments/token
 Authorization: Bearer <ACCESS_TOKEN>
 Content-Type: application/json
 
@@ -116,13 +116,13 @@ Content-Type: application/json
 
 If the amount exceeds my auto-approve limit, you'll get a `step_up_id`. Poll for my approval:
 
-GET https://wsim-dev.banksim.ca/api/agent/v1/payments/token/<step_up_id>/status
+GET https://wsim.banksim.ca/api/agent/v1/payments/token/<step_up_id>/status
 Authorization: Bearer <ACCESS_TOKEN>
 
 ### 8. Complete Purchase
 Submit the payment token to complete checkout:
 
-POST https://ssim-dev.banksim.ca/api/agent/v1/sessions/<session_id>/complete
+POST https://ssim.banksim.ca/api/agent/v1/sessions/<session_id>/complete
 Authorization: Bearer <ACCESS_TOKEN>
 Content-Type: application/json
 
@@ -138,7 +138,7 @@ Content-Type: application/json
 4. Walk me through browsing and selecting a product
 5. Help me complete the purchase
 
-Begin now by discovering the store at https://ssim-dev.banksim.ca/.well-known/ucp
+Begin now by discovering the store at https://ssim.banksim.ca/.well-known/ucp
 ```
 
 ---
@@ -173,7 +173,7 @@ Some AIs (especially free tiers) can't make external HTTP calls. Try:
 Codes expire after 5 minutes. Generate a fresh one.
 
 ### Access request not appearing
-Check that WSIM is deployed and healthy: `https://wsim-dev.banksim.ca/api/health`
+Check that WSIM is deployed and healthy: `https://wsim.banksim.ca/api/health`
 
 ### Payment declined
 - Check spending limits in mwsim
