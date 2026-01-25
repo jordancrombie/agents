@@ -2,15 +2,61 @@
 
 **Author**: PM
 **Date**: 2026-01-25
-**Status**: 🟢 IMPLEMENTED - Phase 1 Complete, Ready for Testing
+**Status**: 🟡 BLOCKED - Awaiting SSIM Change (Option A)
 **Target Release**: Gateway v1.4.0
-**Last Updated**: 2026-01-25 (WSIM Q#1-7 answered; credential provisioning next)
+**Last Updated**: 2026-01-25 (Architecture Decision: Option A confirmed - SSIM to make session endpoints unauthenticated)
 
 ---
 
 ## Executive Summary
 
 This document proposes changes to the SACP Gateway to support a "guest checkout" flow that mirrors standard e-commerce patterns. Currently, the Gateway requires OAuth authentication before users can create a checkout session. This proposal moves authentication to **payment time only**, allowing users to browse and build carts without upfront authorization.
+
+---
+
+## Architectural Decision: Option A Confirmed (2026-01-25)
+
+### Decision
+
+**Option A: SSIM makes guest checkout session endpoints unauthenticated.**
+
+The `security: []` specification in the OpenAPI spec was **deliberate and correct**. Guest checkout semantically means unauthenticated checkout - a "guest" by definition doesn't have credentials.
+
+### Why Option B (Service Tokens) Was Rejected
+
+The Agents team initially implemented a workaround using Gateway service tokens (`getGatewayServiceToken()`) to authenticate with SSIM. This approach was **incorrect** for the following reasons:
+
+| Issue | Problem |
+|-------|---------|
+| **Data model violation** | The Agent schema has `userId` as a required FK to a real `WalletUser`. Creating fake users or returning synthetic IDs for service accounts pollutes this relationship. Every query like "show me agents for user X" becomes unreliable. |
+| **Technical debt** | This workaround causes confusion when someone asks "why does this agent have `owner_id: 00000000-0000-0000-0000-000000000000`?" |
+| **Conflates auth models** | Service-to-service auth is fundamentally different from user-delegated auth. Option B conflates them. |
+| **Wrong trust boundary** | The proper trust boundary is: unauthenticated session creation → authenticated payment completion (via Device Auth). |
+
+### Why Option A Is Correct
+
+| Benefit | Explanation |
+|---------|-------------|
+| **Aligns with design intent** | The design doc was reviewed by multiple teams. `security: []` was deliberate. |
+| **Clean separation** | Browse/cart is unauthenticated; payment completion requires Device Authorization. This is the proper trust boundary. |
+| **SSIM controls scope** | SSIM can make just the guest checkout session endpoints unauthenticated while keeping other routes protected. |
+| **No data model hacks** | No synthetic `owner_id`, no service account workarounds, no confusion. |
+
+### Naming Lesson Learned
+
+Calling it "Gateway" probably contributed to confusion. "Gateway" sounds like infrastructure that would use service-to-service auth. A better name might have been "Guest Checkout Service" to make the unauthenticated nature explicit.
+
+### Required Changes
+
+| Team | Change Required |
+|------|-----------------|
+| **SSIM** | Make guest checkout session endpoints unauthenticated (`POST /sessions`, `PATCH /sessions/:id`, `GET /sessions/:id`) |
+| **Gateway** | Remove `getGatewayServiceToken()` workaround once SSIM change is deployed |
+| **WSIM** | None - Device Authorization already works as designed |
+
+### Current State
+
+The Gateway currently uses a service token workaround (`getGatewayServiceToken()`) which authenticates to SSIM using client credentials. **This is a temporary workaround** and should be removed once SSIM implements Option A.
 
 ---
 
@@ -96,20 +142,35 @@ This document proposes changes to the SACP Gateway to support a "guest checkout"
 
 ## SSIM Team Analysis (2026-01-25)
 
-### Decision: Option A Confirmed
+### ⚠️ SUPERSEDED - See "Architectural Decision: Option A Confirmed" above
 
-The SSIM team has reviewed this proposal and **confirmed Option A (Gateway has its own agent credentials)** is the correct approach.
+~~The SSIM team has reviewed this proposal and **confirmed Option A (Gateway has its own agent credentials)** is the correct approach.~~
 
-| Criteria | Option A: Gateway Credentials | Option B: Anonymous Checkout |
+**This analysis was incorrect.** Senior developers clarified that:
+
+1. **Option A actually means**: SSIM makes guest checkout endpoints unauthenticated (`security: []`)
+2. **NOT**: Gateway uses service tokens to authenticate
+
+The table below reflects the **original (incorrect) analysis** and is preserved for historical context only.
+
+| Criteria | ~~Option A: Gateway Credentials~~ | Option B: Anonymous Checkout |
 |----------|------------------------------|------------------------------|
-| Security Model | ✅ Maintains authenticated actor principle | ❌ Creates anonymous attack surface |
-| SACP Philosophy | ✅ Gateway is a first-class agent | ❌ Violates agent identity model |
-| Multi-tenant Safety | ✅ Credentials scoped by storeId | ❌ Requires additional abuse prevention |
-| Audit Trail | ✅ Every action tied to agent identity | ❌ No attribution for session creation |
-| Future Extensibility | ✅ Pattern scales to more agents | ❌ Sets bad precedent |
-| SSIM Changes | ✅ None required | ❌ Invasive changes needed |
+| ~~Security Model~~ | ~~✅ Maintains authenticated actor principle~~ | ~~❌ Creates anonymous attack surface~~ |
+| ~~SACP Philosophy~~ | ~~✅ Gateway is a first-class agent~~ | ~~❌ Violates agent identity model~~ |
+| ~~Multi-tenant Safety~~ | ~~✅ Credentials scoped by storeId~~ | ~~❌ Requires additional abuse prevention~~ |
+| ~~Audit Trail~~ | ~~✅ Every action tied to agent identity~~ | ~~❌ No attribution for session creation~~ |
+| ~~Future Extensibility~~ | ~~✅ Pattern scales to more agents~~ | ~~❌ Sets bad precedent~~ |
+| ~~SSIM Changes~~ | ~~✅ None required~~ | ~~❌ Invasive changes needed~~ |
 
-**Recommendation: Option A**
+**Correct Understanding (2026-01-25):**
+
+| Criteria | Option A: SSIM Unauthenticated Sessions | Option B: Service Token Workaround |
+|----------|----------------------------------------|-----------------------------------|
+| Design Intent | ✅ Matches original `security: []` spec | ❌ Workaround for implementation divergence |
+| Data Model | ✅ Clean - no synthetic owner_ids | ❌ Violates Agent schema relationships |
+| Trust Boundary | ✅ Proper: unauth cart → auth payment | ❌ Conflates service auth with user auth |
+| Technical Debt | ✅ None | ❌ Confusing synthetic IDs |
+| SSIM Changes | ⚠️ Required (make endpoints unauth) | ❌ None, but wrong approach |
 
 ### Token Introspection Architecture (RFC 7662)
 
@@ -425,13 +486,32 @@ GATEWAY_CLIENT_SECRET=<provided-via-secure-channel>
 
 | Task | Effort | Status |
 |------|--------|--------|
-| **Review**: Confirm agent API allows gateway service token | Review | ✅ CONFIRMED |
-| **Review**: Option A (Gateway credentials) approved | Review | ✅ CONFIRMED |
+| **CHANGE REQUIRED**: Make guest checkout session endpoints unauthenticated | Medium | 🔴 TODO |
+| **Review**: Option A (unauthenticated sessions) confirmed | Review | ✅ CONFIRMED |
 | **Verify**: Ensure `agentContext` passed to NSIM in payment calls | Code Review | ✅ VERIFIED |
+
+**Architecture Decision (2026-01-25):**
+
+**Option A Confirmed**: SSIM should make guest checkout session endpoints **unauthenticated** (`security: []`).
+
+The `security: []` in the OpenAPI spec was deliberate - guest checkout means unauthenticated checkout. The Gateway's service token workaround was incorrect and will be removed.
+
+**SSIM Changes Required:**
+
+| Endpoint | Current | Required | Notes |
+|----------|---------|----------|-------|
+| `POST /api/agent/v1/sessions` | Auth required | **No auth** | Creates cart only |
+| `PATCH /api/agent/v1/sessions/:id` | Auth required | **No auth** | Updates buyer info only |
+| `GET /api/agent/v1/sessions/:id` | Auth required | **No auth** | View cart/status |
+| `POST /api/agent/v1/sessions/:id/complete` | Auth required | Auth required | Payment requires Device Auth token |
+
+**Rationale**: Guest checkout follows standard e-commerce patterns where:
+- Browse, add to cart, provide shipping info → No authentication
+- Pay → Authentication required (Device Authorization at payment time)
 
 **SSIM Verification (2026-01-25):**
 
-`agentContext` is **already implemented** and passed to NSIM. No code changes required.
+`agentContext` is **already implemented** and passed to NSIM. The agentContext code is correct and needs no changes.
 
 | Component | Status | Location |
 |-----------|--------|----------|
@@ -715,11 +795,18 @@ Body: { reason?: "User declined" }
 | 4 | Agents Team | Add `sacp-gateway` client_id/secret to Gateway config | Config | ✅ Done |
 | 5 | Agents Team | Implement guest checkout (Phase 1 tasks) | Code | ✅ Done |
 
-**🟡 Remaining Work:**
+**🔴 BLOCKING - Architecture Fix Required:**
+
+| # | Owner | Task | Type | Status |
+|---|-------|------|------|--------|
+| 10 | SSIM Team | **Make guest checkout session endpoints unauthenticated** (`security: []`) | Code | 🔴 TODO |
+| 11 | Agents Team | Remove `getGatewayServiceToken()` workaround from Gateway | Code | ⏳ Blocked by #10 |
+
+**🟡 Remaining Work (Non-Blocking):**
 
 | # | Owner | Task | Type |
 |---|-------|------|------|
-| 8 | DevOps | Confirm `ssim-merchant` + `sacp-gateway` in prod `INTROSPECTION_CLIENTS` | Config |
+| 8 | DevOps | Confirm `ssim-merchant` in prod `INTROSPECTION_CLIENTS` | Config |
 
 **🟢 Nice-to-Have:**
 
@@ -727,17 +814,21 @@ Body: { reason?: "User declined" }
 |---|-------|------|------|--------|
 | 9 | WSIM Team | Shorten user codes to `WSIM-XXXXXX` | Enhancement | ✅ Done |
 
+**Note:** Item #8 (`sacp-gateway` in `INTROSPECTION_CLIENTS`) is no longer needed once SSIM implements Option A. The Gateway won't use service tokens for guest checkout.
+
 ---
 
 ## Risks and Mitigations
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
-| ~~SSIM requires per-user auth for checkout~~ | ~~Medium~~ | ~~High~~ | ✅ **Resolved**: Option A confirmed - Gateway uses own agent credentials |
+| **SSIM change delayed** | Medium | High | 🔴 **CURRENT BLOCKER**: Waiting for SSIM to make session endpoints unauthenticated (Option A) |
+| ~~SSIM requires per-user auth for checkout~~ | ~~Medium~~ | ~~High~~ | ✅ **Resolved**: Option A confirmed - SSIM will make guest checkout endpoints unauthenticated |
 | ~~agentContext not passed through SSIM → NSIM~~ | ~~Low~~ | ~~Medium~~ | ✅ **Resolved**: Already implemented in SSIM payment service |
 | Device auth flow has unexpected limitations | Low | Medium | Early testing with WSIM team |
 | ChatGPT doesn't handle 202 responses well | Low | Medium | Also support query parameter for auth token |
 | ~~WSIM agent registration process unclear~~ | ~~Low~~ | ~~Medium~~ | ✅ **Resolved**: `sacp-gateway` registered, credentials provided |
+| ~~Service token introspection missing fields~~ | ~~Medium~~ | ~~High~~ | ✅ **Resolved**: Service tokens rejected; Option A (unauthenticated) is correct approach |
 
 ---
 
@@ -777,15 +868,18 @@ Body: { reason?: "User declined" }
 | 1.5 | Configure `GATEWAY_CLIENT_ID`, `GATEWAY_CLIENT_SECRET` | Agents Team | 0.3 | ✅ DONE |
 | 1.6 | Update CHANGELOG and bump to v1.4.0 | Agents Team | 1.1-1.5 | ✅ DONE |
 
-### Phase 2: Parallel Verification (2026-01-27 → 2026-01-28)
+### Phase 2: SSIM Architecture Fix (BLOCKING)
 
-**Goal:** Verify supporting systems work correctly.
+**Goal:** SSIM implements Option A - unauthenticated guest checkout sessions.
 
 | # | Task | Owner | Depends On | Status |
 |---|------|-------|------------|--------|
+| 2.0 | **SSIM: Make guest checkout session endpoints unauthenticated** | SSIM Team | - | 🔴 TODO |
 | 2.1 | SSIM: Verify `agentContext` passed to NSIM in payments | SSIM Team | - | ✅ DONE |
 | 2.2 | mwsim: Ensure "Enter Code" screen accessible in app | mwsim Team | - | ✅ DONE |
-| 2.3 | WSIM: Confirm `ssim-merchant` in prod `INTROSPECTION_CLIENTS` | WSIM Team | - | ⬜ TODO |
+| 2.3 | Gateway: Remove `getGatewayServiceToken()` workaround | Agents Team | 2.0 | ⏳ Blocked |
+
+**Note:** Phase 3 and 4 are blocked until SSIM completes task 2.0.
 
 ### Phase 3: Integration Testing (2026-01-29)
 
@@ -813,17 +907,18 @@ Body: { reason?: "User declined" }
 ## Team Assignments Summary
 
 ### Agents Team (us - owns Gateway)
-- **Phase 1**: All implementation tasks (1.1-1.6)
-- **Phase 3-4**: Deployment and ChatGPT integration
+- **Phase 1**: ✅ All implementation tasks complete (1.1-1.6)
+- **Phase 2**: ⏳ Remove service token workaround (blocked by SSIM)
+- **Phase 3-4**: Deployment and ChatGPT integration (blocked by Phase 2)
 
 ### WSIM Team (Wallet)
-- **Phase 0** (BLOCKING): Client registration, credentials
-- **Phase 2**: Production config verification
-- **Nice-to-have**: Shorter user codes
+- **Phase 0**: ✅ Client registration, credentials complete
+- **Nice-to-have**: ✅ Shorter user codes implemented
 
 ### SSIM Team (Store)
-- **Phase 2**: Verify agentContext flow to NSIM
-- ✅ Already approved design
+- **Phase 2**: 🔴 **BLOCKING** - Make guest checkout session endpoints unauthenticated (`security: []`)
+- **Rationale**: The original design spec was correct. Guest checkout = unauthenticated checkout.
+- ✅ agentContext flow to NSIM already verified
 
 ### mwsim Team (Mobile App)
 - **Phase 2**: Ensure "Enter Code" screen accessible ✅ COMPLETE
