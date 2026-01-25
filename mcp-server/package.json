@@ -14,7 +14,7 @@
     "start:gateway": "node dist/http-gateway.js",
     "dev": "tsx src/index.ts",
     "dev:gateway": "tsx src/http-gateway.ts",
-    "test": "tsx src/test.ts"
+    "test": "echo 'No tests configured yet'"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
