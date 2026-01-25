@@ -5,6 +5,32 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-01-25
+
+### Added
+- **Guest Checkout Flow**: AI agents can now browse products and create checkouts without upfront OAuth authentication
+  - Authentication only required at payment time via RFC 8628 Device Authorization Grant
+  - Enables ChatGPT Actions and other LLM integrations without OAuth setup complexity
+- **Device Authorization Grant (RFC 8628)**: New payment authorization flow for guest checkout
+  - `POST /checkout/:session_id/complete` returns 202 with `authorization_required` status for unauthenticated users
+  - Returns user code (e.g., `WSIM-A3J2K9`) and verification URI for wallet app authorization
+  - `GET /checkout/:session_id/payment-status/:request_id` - New polling endpoint for payment authorization status
+- **Gateway Credentials**: Gateway now has its own OAuth client credentials for device authorization
+  - Configured via `GATEWAY_CLIENT_ID` and `GATEWAY_CLIENT_SECRET` environment variables
+  - Registered with WSIM as `sacp-gateway` client
+- **Spending Limits Scoping**: Payment authorization requests scope spending limits to exact checkout total
+
+### Changed
+- **Checkout Routes No Longer Require Auth**: `POST /checkout`, `PATCH /checkout/:id`, and `GET /checkout/:id` now work without authentication
+- OpenAPI spec updated with `security: []` for guest checkout endpoints
+- Added `AuthorizationRequired` and `PaymentStatus` schemas to OpenAPI spec
+- Version bumped to 1.4.0
+
+### Technical Details
+- Guest checkouts stored in `guestCheckouts` map for session tracking
+- Device authorization requests stored in `pendingDeviceAuths` map with expiration handling
+- Supports RFC 8628 error responses: `authorization_pending`, `slow_down`, `access_denied`, `expired_token`
+
 ## [1.3.1] - 2026-01-25
 
 ### Fixed

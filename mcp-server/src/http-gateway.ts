@@ -28,6 +28,12 @@ const config = {
   ssim: {
     baseUrl: process.env.SSIM_BASE_URL || 'https://ssim.banksim.ca',
   },
+  gateway: {
+    // Gateway's own OAuth credentials for device authorization flow
+    clientId: process.env.GATEWAY_CLIENT_ID || 'sacp-gateway',
+    clientSecret: process.env.GATEWAY_CLIENT_SECRET || '',
+    baseUrl: process.env.GATEWAY_BASE_URL || 'https://sacp.banksim.ca',
+  },
 };
 
 // Session storage (in-memory for demo, use Redis for production)
@@ -48,6 +54,34 @@ const sessions = new Map<string, Session>();
 const pendingRegistrations = new Map<string, { requestId: string; pollUrl: string; expiresAt: string }>();
 // Cache Bearer tokens to sessions for performance
 const bearerTokenSessions = new Map<string, Session>();
+
+// Guest checkout sessions (no auth required until payment)
+interface GuestCheckout {
+  sessionId: string;
+  ssimSessionId: string; // The session ID from SSIM
+  createdAt: Date;
+  cart?: {
+    total: number;
+    currency: string;
+    items: Array<{ product_id: string; quantity: number }>;
+  };
+}
+const guestCheckouts = new Map<string, GuestCheckout>();
+
+// Pending device authorization requests (for guest checkout payment)
+interface PendingDeviceAuth {
+  requestId: string;
+  checkoutSessionId: string;
+  ssimSessionId: string;
+  deviceCode: string;
+  userCode: string;
+  verificationUri: string;
+  expiresAt: Date;
+  interval: number; // polling interval in seconds
+  amount: number;
+  currency: string;
+}
+const pendingDeviceAuths = new Map<string, PendingDeviceAuth>();
 
 // Generate a simple session ID
 function generateSessionId(): string {
@@ -246,7 +280,7 @@ async function getClients(session: Session): Promise<{ wsim: WsimClient; ssim: S
 app.get('/tools', (req, res) => {
   res.json({
     name: 'SACP Agent Gateway',
-    version: '1.3.1',
+    version: '1.4.0',
     description: 'HTTP gateway for AI agents to browse and purchase from SimToolBox stores',
     base_url: `${req.protocol}://${req.get('host')}`,
     authentication: {
@@ -294,7 +328,7 @@ app.get('/openapi.json', (req, res) => {
 **Two Authentication Options:**
 
 Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the OAuth flow automatically when configured as a connector.`,
-      version: '1.3.1',
+      version: '1.4.0',
       contact: {
         name: 'SimToolBox',
         url: 'https://simtoolbox.com',
@@ -463,8 +497,8 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
         post: {
           operationId: 'createCheckout',
           summary: 'Create checkout session',
-          description: 'Create a new checkout with items. Requires authentication via OAuth Bearer token or X-Session-Id.',
-          security: [{ oauth2: ['shopping'] }],
+          description: 'Create a new guest checkout with items. No authentication required - payment authorization happens at checkout completion.',
+          security: [],
           requestBody: {
             required: true,
             content: {
@@ -506,7 +540,8 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
         patch: {
           operationId: 'updateCheckout',
           summary: 'Update checkout with buyer/shipping info',
-          security: [{ oauth2: ['shopping'] }],
+          description: 'Add buyer information and shipping details to the checkout session. No authentication required.',
+          security: [],
           parameters: [
             {
               name: 'session_id',
@@ -566,8 +601,8 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
         post: {
           operationId: 'completeCheckout',
           summary: 'Complete the purchase',
-          description: 'Finalize the checkout. Gateway handles payment authorization automatically. May return step_up_required if purchase exceeds limit.',
-          security: [{ oauth2: ['shopping'] }],
+          description: 'Finalize the checkout. For guest checkout (no Bearer token), returns authorization_required with a user code and URL for the user to approve payment in their wallet app. Poll the payment-status endpoint until approved.',
+          security: [],
           parameters: [
             {
               name: 'session_id',
@@ -578,7 +613,7 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
           ],
           responses: {
             '200': {
-              description: 'Purchase completed',
+              description: 'Purchase completed (user was already authenticated)',
               content: {
                 'application/json': {
                   schema: {
@@ -594,18 +629,10 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
               },
             },
             '202': {
-              description: 'Step-up approval required',
+              description: 'Payment authorization required - user must approve in wallet app',
               content: {
                 'application/json': {
-                  schema: {
-                    type: 'object',
-                    properties: {
-                      status: { type: 'string', enum: ['step_up_required'] },
-                      step_up_id: { type: 'string' },
-                      poll_endpoint: { type: 'string' },
-                      message: { type: 'string' },
-                    },
-                  },
+                  schema: { $ref: '#/components/schemas/AuthorizationRequired' },
                 },
               },
             },
@@ -647,6 +674,43 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
                   },
                 },
               },
+            },
+          },
+        },
+      },
+      '/checkout/{session_id}/payment-status/{request_id}': {
+        get: {
+          operationId: 'getPaymentStatus',
+          summary: 'Poll for payment authorization status',
+          description: 'Poll this endpoint after receiving authorization_required from completeCheckout. Returns pending until user approves/rejects in their wallet app, or the request expires.',
+          security: [],
+          parameters: [
+            {
+              name: 'session_id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+              description: 'Checkout session ID',
+            },
+            {
+              name: 'request_id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+              description: 'Payment authorization request ID from poll_endpoint',
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Payment authorization status',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/PaymentStatus' },
+                },
+              },
+            },
+            '404': {
+              description: 'Session or request not found',
             },
           },
         },
@@ -776,6 +840,30 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
             total: { type: 'number' },
             currency: { type: 'string' },
             transaction_id: { type: 'string' },
+          },
+        },
+        AuthorizationRequired: {
+          type: 'object',
+          description: 'Returned when user must authorize payment in their wallet app',
+          properties: {
+            status: { type: 'string', enum: ['authorization_required'] },
+            authorization_url: { type: 'string', description: 'URL for user to authorize payment' },
+            user_code: { type: 'string', description: 'Short code user can enter in wallet app (e.g., WSIM-A3J2K9)' },
+            verification_uri: { type: 'string', description: 'URL where user can enter the code' },
+            poll_endpoint: { type: 'string', description: 'Endpoint to poll for authorization status' },
+            expires_in: { type: 'integer', description: 'Seconds until authorization request expires' },
+            message: { type: 'string', description: 'Human-readable message for the user' },
+          },
+        },
+        PaymentStatus: {
+          type: 'object',
+          description: 'Status of a payment authorization request',
+          properties: {
+            status: { type: 'string', enum: ['pending', 'completed', 'rejected', 'expired'] },
+            order_id: { type: 'string', description: 'Order ID (only present when completed)' },
+            transaction_id: { type: 'string', description: 'Transaction ID (only present when completed)' },
+            expires_in: { type: 'integer', description: 'Seconds until request expires (only present when pending)' },
+            message: { type: 'string', description: 'Human-readable status message' },
           },
         },
       },
@@ -1021,10 +1109,10 @@ function requireSession(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-// Create checkout
-app.post('/checkout', requireSession, async (req, res) => {
+// Create checkout (supports guest checkout - no auth required)
+app.post('/checkout', async (req, res) => {
   try {
-    const session = (req as any).session as Session;
+    const session = (req as any).session as Session | undefined;
     const { items } = req.body;
 
     if (!items || !Array.isArray(items)) {
@@ -1034,11 +1122,41 @@ app.post('/checkout', requireSession, async (req, res) => {
       });
     }
 
-    const { ssim } = await getClients(session);
-    const checkout = await ssim.createCheckout(items);
+    // If authenticated, use existing flow
+    if (session) {
+      const { ssim } = await getClients(session);
+      const checkout = await ssim.createCheckout(items);
+      return res.json({
+        ...checkout,
+        next_step: 'PATCH /checkout/:session_id with buyer and fulfillment info',
+      });
+    }
+
+    // Guest checkout - call SSIM directly without auth
+    const response = await fetch(`${config.ssim.baseUrl}/api/agent/v1/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return res.status(response.status).json(errorData);
+    }
+
+    const ssimCheckout = await response.json();
+
+    // Store guest checkout session
+    const guestCheckout: GuestCheckout = {
+      sessionId: ssimCheckout.session_id,
+      ssimSessionId: ssimCheckout.session_id,
+      createdAt: new Date(),
+      cart: ssimCheckout.cart,
+    };
+    guestCheckouts.set(ssimCheckout.session_id, guestCheckout);
 
     res.json({
-      ...checkout,
+      ...ssimCheckout,
       next_step: 'PATCH /checkout/:session_id with buyer and fulfillment info',
     });
   } catch (error) {
@@ -1050,24 +1168,29 @@ app.post('/checkout', requireSession, async (req, res) => {
   }
 });
 
-// Update checkout
-app.patch('/checkout/:session_id', requireSession, async (req, res) => {
+// Update checkout (supports guest checkout - no auth required)
+app.patch('/checkout/:session_id', async (req, res) => {
   try {
-    const session = (req as any).session as Session;
+    const session = (req as any).session as Session | undefined;
     const { session_id } = req.params;
     const { buyer, fulfillment, items } = req.body;
 
-    const { wsim } = await getClients(session);
-    const token = await wsim.getAccessToken();
+    // Build headers - include auth token if session exists
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (session) {
+      const { wsim } = await getClients(session);
+      const token = await wsim.getAccessToken();
+      headers['Authorization'] = `Bearer ${token}`;
+    }
 
     const response = await fetch(
       `${config.ssim.baseUrl}/api/agent/v1/sessions/${session_id}`,
       {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({ buyer, fulfillment, items }),
       }
     );
@@ -1076,6 +1199,12 @@ app.patch('/checkout/:session_id', requireSession, async (req, res) => {
 
     if (!response.ok) {
       return res.status(response.status).json(data);
+    }
+
+    // Update guest checkout cart info if this is a guest session
+    const guestCheckout = guestCheckouts.get(session_id);
+    if (guestCheckout && data.cart) {
+      guestCheckout.cart = data.cart;
     }
 
     res.json({
@@ -1093,13 +1222,30 @@ app.patch('/checkout/:session_id', requireSession, async (req, res) => {
   }
 });
 
-// Get checkout
-app.get('/checkout/:session_id', requireSession, async (req, res) => {
+// Get checkout (supports guest checkout - no auth required)
+app.get('/checkout/:session_id', async (req, res) => {
   try {
-    const session = (req as any).session as Session;
+    const session = (req as any).session as Session | undefined;
     const { session_id } = req.params;
-    const { ssim } = await getClients(session);
-    const checkout = await ssim.getCheckout(session_id);
+
+    // If authenticated, use session's credentials
+    if (session) {
+      const { ssim } = await getClients(session);
+      const checkout = await ssim.getCheckout(session_id);
+      return res.json(checkout);
+    }
+
+    // Guest checkout - call SSIM directly
+    const response = await fetch(
+      `${config.ssim.baseUrl}/api/agent/v1/sessions/${session_id}`
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return res.status(response.status).json(errorData);
+    }
+
+    const checkout = await response.json();
     res.json(checkout);
   } catch (error) {
     console.error('Get checkout error:', error);
@@ -1111,14 +1257,28 @@ app.get('/checkout/:session_id', requireSession, async (req, res) => {
 });
 
 // Complete checkout (handles payment token automatically)
-app.post('/checkout/:session_id/complete', requireSession, async (req, res) => {
+// For authenticated users: processes payment immediately
+// For guest checkout: initiates device authorization flow (RFC 8628)
+app.post('/checkout/:session_id/complete', async (req, res) => {
   try {
-    const session = (req as any).session as Session;
+    const session = (req as any).session as Session | undefined;
     const { session_id } = req.params;
-    const { wsim, ssim } = await getClients(session);
 
-    // Get checkout to find total
-    const checkout = await ssim.getCheckout(session_id);
+    // Get checkout to find total (works for both authenticated and guest)
+    let checkout: any;
+    if (session) {
+      const { ssim } = await getClients(session);
+      checkout = await ssim.getCheckout(session_id);
+    } else {
+      const response = await fetch(
+        `${config.ssim.baseUrl}/api/agent/v1/sessions/${session_id}`
+      );
+      if (!response.ok) {
+        const errorData = await response.json();
+        return res.status(response.status).json(errorData);
+      }
+      checkout = await response.json();
+    }
 
     if (checkout.status !== 'ready_for_payment') {
       return res.status(400).json({
@@ -1128,43 +1288,108 @@ app.post('/checkout/:session_id/complete', requireSession, async (req, res) => {
       });
     }
 
-    // Request payment token
-    const paymentResult = await wsim.requestPaymentToken({
-      amount: checkout.cart.total,
-      currency: checkout.cart.currency,
-      merchant_id: 'ssim_ssim_banksim_ca',
-      session_id: session_id,
-    });
+    // If user is authenticated, use existing flow
+    if (session) {
+      const { wsim, ssim } = await getClients(session);
 
-    // Check if step-up is required
-    if (paymentResult.step_up_required && paymentResult.step_up_id) {
-      return res.status(202).json({
-        status: 'step_up_required',
-        step_up_id: paymentResult.step_up_id,
-        message: 'Purchase exceeds auto-approve limit. User must approve in wallet app.',
-        poll_endpoint: `/checkout/${session_id}/step-up/${paymentResult.step_up_id}`,
+      // Request payment token
+      const paymentResult = await wsim.requestPaymentToken({
         amount: checkout.cart.total,
         currency: checkout.cart.currency,
+        merchant_id: 'ssim_ssim_banksim_ca',
+        session_id: session_id,
+      });
+
+      // Check if step-up is required
+      if (paymentResult.step_up_required && paymentResult.step_up_id) {
+        return res.status(202).json({
+          status: 'step_up_required',
+          step_up_id: paymentResult.step_up_id,
+          message: 'Purchase exceeds auto-approve limit. User must approve in wallet app.',
+          poll_endpoint: `/checkout/${session_id}/step-up/${paymentResult.step_up_id}`,
+          amount: checkout.cart.total,
+          currency: checkout.cart.currency,
+        });
+      }
+
+      if (!paymentResult.payment_token) {
+        return res.status(500).json({
+          error: 'payment_error',
+          error_description: 'Failed to get payment token',
+        });
+      }
+
+      // Complete the checkout
+      const order = await ssim.completeCheckout(session_id, paymentResult.payment_token);
+
+      return res.json({
+        status: 'completed',
+        order_id: order.id,
+        transaction_id: order.transaction_id,
+        total: checkout.cart.total,
+        currency: checkout.cart.currency,
+        message: 'Purchase completed successfully!',
       });
     }
 
-    if (!paymentResult.payment_token) {
-      return res.status(500).json({
-        error: 'payment_error',
-        error_description: 'Failed to get payment token',
+    // Guest checkout - initiate Device Authorization Grant (RFC 8628)
+    // Call WSIM device_authorization endpoint
+    const deviceAuthResponse = await fetch(
+      `${config.wsim.baseUrl}/api/agent/v1/oauth/device_authorization`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: config.gateway.clientId,
+          agent_name: 'SACP Gateway',
+          scope: 'payment',
+          spending_limits: {
+            per_transaction: checkout.cart.total,
+            currency: checkout.cart.currency,
+          },
+        }),
+      }
+    );
+
+    if (!deviceAuthResponse.ok) {
+      const errorData = await deviceAuthResponse.json();
+      console.error('Device authorization failed:', errorData);
+      return res.status(deviceAuthResponse.status).json({
+        error: 'authorization_failed',
+        error_description: errorData.error_description || 'Failed to initiate payment authorization',
+        details: errorData,
       });
     }
 
-    // Complete the checkout
-    const order = await ssim.completeCheckout(session_id, paymentResult.payment_token);
+    const deviceAuth = await deviceAuthResponse.json();
 
-    res.json({
-      status: 'completed',
-      order_id: order.id,
-      transaction_id: order.transaction_id,
-      total: checkout.cart.total,
+    // Generate a request ID for tracking
+    const requestId = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+    // Store pending device authorization
+    const pendingAuth: PendingDeviceAuth = {
+      requestId,
+      checkoutSessionId: session_id,
+      ssimSessionId: session_id,
+      deviceCode: deviceAuth.device_code,
+      userCode: deviceAuth.user_code,
+      verificationUri: deviceAuth.verification_uri,
+      expiresAt: new Date(Date.now() + (deviceAuth.expires_in || 300) * 1000),
+      interval: deviceAuth.interval || 5,
+      amount: checkout.cart.total,
       currency: checkout.cart.currency,
-      message: 'Purchase completed successfully!',
+    };
+    pendingDeviceAuths.set(requestId, pendingAuth);
+
+    // Return 202 with authorization required response
+    return res.status(202).json({
+      status: 'authorization_required',
+      authorization_url: deviceAuth.verification_uri_complete || deviceAuth.verification_uri,
+      user_code: deviceAuth.user_code,
+      verification_uri: deviceAuth.verification_uri,
+      poll_endpoint: `/checkout/${session_id}/payment-status/${requestId}`,
+      expires_in: deviceAuth.expires_in || 300,
+      message: `To complete your purchase of ${(checkout.cart.total / 100).toFixed(2)} ${checkout.cart.currency}, please enter code ${deviceAuth.user_code} at ${deviceAuth.verification_uri} or open the link in your wallet app.`,
     });
   } catch (error) {
     console.error('Complete checkout error:', error);
@@ -1212,6 +1437,183 @@ app.get('/checkout/:session_id/step-up/:step_up_id', requireSession, async (req,
     }
   } catch (error) {
     console.error('Step-up status error:', error);
+    res.status(500).json({
+      error: 'server_error',
+      error_description: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Poll payment authorization status (for guest checkout device auth flow)
+app.get('/checkout/:session_id/payment-status/:request_id', async (req, res) => {
+  try {
+    const { session_id, request_id } = req.params;
+
+    // Find the pending device authorization
+    const pendingAuth = pendingDeviceAuths.get(request_id);
+
+    if (!pendingAuth) {
+      return res.status(404).json({
+        error: 'not_found',
+        error_description: 'Payment authorization request not found',
+      });
+    }
+
+    // Verify session_id matches
+    if (pendingAuth.checkoutSessionId !== session_id) {
+      return res.status(404).json({
+        error: 'not_found',
+        error_description: 'Session ID does not match payment request',
+      });
+    }
+
+    // Check if expired
+    if (new Date() > pendingAuth.expiresAt) {
+      pendingDeviceAuths.delete(request_id);
+      return res.json({
+        status: 'expired',
+        message: 'Payment authorization request has expired. Please try again.',
+      });
+    }
+
+    // Poll WSIM token endpoint with device_code
+    const tokenResponse = await fetch(
+      `${config.wsim.baseUrl}/api/agent/v1/oauth/token`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+          device_code: pendingAuth.deviceCode,
+          client_id: config.gateway.clientId,
+        }).toString(),
+      }
+    );
+
+    const tokenData = await tokenResponse.json();
+
+    // Handle different responses per RFC 8628
+    if (tokenResponse.ok && tokenData.access_token) {
+      // User approved - we have an access token!
+      // Now complete the checkout with SSIM using this token
+
+      // First, get a payment token from WSIM using the access token
+      const paymentTokenResponse = await fetch(
+        `${config.wsim.baseUrl}/api/agent/v1/payment-tokens`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${tokenData.access_token}`,
+          },
+          body: JSON.stringify({
+            amount: pendingAuth.amount,
+            currency: pendingAuth.currency,
+            merchant_id: 'ssim_ssim_banksim_ca',
+            session_id: pendingAuth.ssimSessionId,
+          }),
+        }
+      );
+
+      if (!paymentTokenResponse.ok) {
+        const errorData = await paymentTokenResponse.json();
+        console.error('Payment token request failed:', errorData);
+        return res.status(500).json({
+          error: 'payment_error',
+          error_description: 'Failed to get payment token after authorization',
+          details: errorData,
+        });
+      }
+
+      const paymentTokenData = await paymentTokenResponse.json();
+
+      // Complete checkout with SSIM
+      const completeResponse = await fetch(
+        `${config.ssim.baseUrl}/api/agent/v1/sessions/${pendingAuth.ssimSessionId}/complete`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${tokenData.access_token}`,
+          },
+          body: JSON.stringify({
+            payment_token: paymentTokenData.payment_token,
+          }),
+        }
+      );
+
+      if (!completeResponse.ok) {
+        const errorData = await completeResponse.json();
+        console.error('Checkout completion failed:', errorData);
+        return res.status(500).json({
+          error: 'checkout_error',
+          error_description: 'Failed to complete checkout',
+          details: errorData,
+        });
+      }
+
+      const order = await completeResponse.json();
+
+      // Clean up pending auth
+      pendingDeviceAuths.delete(request_id);
+      guestCheckouts.delete(session_id);
+
+      return res.json({
+        status: 'completed',
+        order_id: order.id || order.order_id,
+        transaction_id: order.transaction_id,
+        message: 'Payment authorized and purchase completed successfully!',
+      });
+    }
+
+    // Handle error responses
+    if (tokenData.error === 'authorization_pending') {
+      // Still waiting for user
+      const expiresIn = Math.max(0, Math.floor((pendingAuth.expiresAt.getTime() - Date.now()) / 1000));
+      return res.json({
+        status: 'pending',
+        expires_in: expiresIn,
+        message: `Waiting for user to authorize payment. Enter code ${pendingAuth.userCode} at ${pendingAuth.verificationUri}`,
+      });
+    }
+
+    if (tokenData.error === 'slow_down') {
+      // We're polling too fast - increase interval
+      pendingAuth.interval = Math.min(pendingAuth.interval + 5, 30);
+      const expiresIn = Math.max(0, Math.floor((pendingAuth.expiresAt.getTime() - Date.now()) / 1000));
+      return res.json({
+        status: 'pending',
+        expires_in: expiresIn,
+        message: 'Waiting for user authorization...',
+      });
+    }
+
+    if (tokenData.error === 'access_denied') {
+      // User rejected
+      pendingDeviceAuths.delete(request_id);
+      return res.json({
+        status: 'rejected',
+        message: 'User rejected the payment authorization.',
+      });
+    }
+
+    if (tokenData.error === 'expired_token') {
+      // Device code expired
+      pendingDeviceAuths.delete(request_id);
+      return res.json({
+        status: 'expired',
+        message: 'Payment authorization request has expired. Please try again.',
+      });
+    }
+
+    // Unknown error
+    console.error('Unexpected token response:', tokenData);
+    return res.status(500).json({
+      error: 'authorization_error',
+      error_description: tokenData.error_description || 'Unknown authorization error',
+    });
+  } catch (error) {
+    console.error('Payment status error:', error);
     res.status(500).json({
       error: 'server_error',
       error_description: error instanceof Error ? error.message : 'Unknown error',
