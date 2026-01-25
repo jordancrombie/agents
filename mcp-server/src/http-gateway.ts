@@ -83,46 +83,6 @@ interface PendingDeviceAuth {
 }
 const pendingDeviceAuths = new Map<string, PendingDeviceAuth>();
 
-// Gateway service token cache (for calling SSIM on behalf of guest users)
-let gatewayServiceToken: { token: string; expiresAt: number } | null = null;
-
-// Get Gateway's own service token via client credentials grant
-async function getGatewayServiceToken(): Promise<string> {
-  // Check if we have a valid cached token (with 60s buffer)
-  if (gatewayServiceToken && gatewayServiceToken.expiresAt > Date.now() + 60000) {
-    return gatewayServiceToken.token;
-  }
-
-  // Request new token via client credentials grant
-  const response = await fetch(`${config.wsim.baseUrl}/api/agent/v1/oauth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: config.gateway.clientId,
-      client_secret: config.gateway.clientSecret,
-      scope: 'agent',
-    }).toString(),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    console.error('Failed to get Gateway service token:', errorData);
-    throw new Error(`Failed to get Gateway service token: ${errorData.error_description || errorData.error}`);
-  }
-
-  const tokenData = await response.json();
-
-  // Cache the token
-  gatewayServiceToken = {
-    token: tokenData.access_token,
-    expiresAt: Date.now() + (tokenData.expires_in || 3600) * 1000,
-  };
-
-  console.log('Gateway service token acquired, expires in', tokenData.expires_in, 'seconds');
-  return gatewayServiceToken.token;
-}
-
 // Generate a simple session ID
 function generateSessionId(): string {
   return `sess_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
@@ -1172,13 +1132,11 @@ app.post('/checkout', async (req, res) => {
       });
     }
 
-    // Guest checkout - use Gateway's service token to call SSIM
-    const serviceToken = await getGatewayServiceToken();
+    // Guest checkout - SSIM session endpoints are unauthenticated (Option A)
     const response = await fetch(`${config.ssim.baseUrl}/api/agent/v1/sessions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${serviceToken}`,
       },
       body: JSON.stringify({ items }),
     });
@@ -1219,24 +1177,21 @@ app.patch('/checkout/:session_id', async (req, res) => {
     const { session_id } = req.params;
     const { buyer, fulfillment, items } = req.body;
 
-    // Build headers - include auth token (user's or Gateway's service token)
-    let token: string;
+    // Build headers - authenticated users include token, guest checkout is unauthenticated
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
     if (session) {
       const { wsim } = await getClients(session);
-      token = await wsim.getAccessToken();
-    } else {
-      // Guest checkout - use Gateway's service token
-      token = await getGatewayServiceToken();
+      headers['Authorization'] = `Bearer ${await wsim.getAccessToken()}`;
     }
+    // Guest checkout - SSIM session endpoints are unauthenticated (Option A)
 
     const response = await fetch(
       `${config.ssim.baseUrl}/api/agent/v1/sessions/${session_id}`,
       {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({ buyer, fulfillment, items }),
       }
     );
@@ -1281,15 +1236,9 @@ app.get('/checkout/:session_id', async (req, res) => {
       return res.json(checkout);
     }
 
-    // Guest checkout - use Gateway's service token
-    const serviceToken = await getGatewayServiceToken();
+    // Guest checkout - SSIM session endpoints are unauthenticated (Option A)
     const response = await fetch(
-      `${config.ssim.baseUrl}/api/agent/v1/sessions/${session_id}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${serviceToken}`,
-        },
-      }
+      `${config.ssim.baseUrl}/api/agent/v1/sessions/${session_id}`
     );
 
     if (!response.ok) {
@@ -1322,15 +1271,9 @@ app.post('/checkout/:session_id/complete', async (req, res) => {
       const { ssim } = await getClients(session);
       checkout = await ssim.getCheckout(session_id);
     } else {
-      // Guest checkout - use Gateway's service token
-      const serviceToken = await getGatewayServiceToken();
+      // Guest checkout - SSIM session endpoints are unauthenticated (Option A)
       const response = await fetch(
-        `${config.ssim.baseUrl}/api/agent/v1/sessions/${session_id}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${serviceToken}`,
-          },
-        }
+        `${config.ssim.baseUrl}/api/agent/v1/sessions/${session_id}`
       );
       if (!response.ok) {
         const errorData = await response.json();
