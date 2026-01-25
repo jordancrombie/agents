@@ -246,7 +246,7 @@ async function getClients(session: Session): Promise<{ wsim: WsimClient; ssim: S
 app.get('/tools', (req, res) => {
   res.json({
     name: 'SACP Agent Gateway',
-    version: '1.3.0',
+    version: '1.3.1',
     description: 'HTTP gateway for AI agents to browse and purchase from SimToolBox stores',
     base_url: `${req.protocol}://${req.get('host')}`,
     authentication: {
@@ -280,22 +280,21 @@ app.get('/health', (req, res) => {
 
 // OpenAPI spec for ChatGPT Actions and other LLM integrations
 app.get('/openapi.json', (req, res) => {
-  const baseUrl = process.env.GATEWAY_BASE_URL || `${req.protocol}://${req.get('host')}`;
+  // Force HTTPS for production - ChatGPT requires server URL to match origin
+  const baseUrl = process.env.GATEWAY_BASE_URL || 'https://sacp.banksim.ca';
 
   const wsimBaseUrl = config.wsim.baseUrl;
 
   const openApiSpec = {
-    openapi: '3.0.0',
+    openapi: '3.1.0',
     info: {
       title: 'SACP Agent Gateway',
       description: `AI shopping assistant API for browsing products and completing purchases.
 
 **Two Authentication Options:**
 
-1. **OAuth 2.0 (Recommended for ChatGPT Connectors)**: Use WSIM OAuth to get a Bearer token, then include it as \`Authorization: Bearer <token>\`
-
-2. **Pairing Code Flow**: Ask user for a pairing code from their wallet app, register via /auth/register, then use the session_id as \`X-Session-Id\` header`,
-      version: '1.3.0',
+Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the OAuth flow automatically when configured as a connector.`,
+      version: '1.3.1',
       contact: {
         name: 'SimToolBox',
         url: 'https://simtoolbox.com',
@@ -465,7 +464,7 @@ app.get('/openapi.json', (req, res) => {
           operationId: 'createCheckout',
           summary: 'Create checkout session',
           description: 'Create a new checkout with items. Requires authentication via OAuth Bearer token or X-Session-Id.',
-          security: [{ oauth2: ['shopping'] }, { bearerAuth: [] }, { sessionId: [] }],
+          security: [{ oauth2: ['shopping'] }],
           requestBody: {
             required: true,
             content: {
@@ -507,7 +506,7 @@ app.get('/openapi.json', (req, res) => {
         patch: {
           operationId: 'updateCheckout',
           summary: 'Update checkout with buyer/shipping info',
-          security: [{ oauth2: ['shopping'] }, { bearerAuth: [] }, { sessionId: [] }],
+          security: [{ oauth2: ['shopping'] }],
           parameters: [
             {
               name: 'session_id',
@@ -568,7 +567,7 @@ app.get('/openapi.json', (req, res) => {
           operationId: 'completeCheckout',
           summary: 'Complete the purchase',
           description: 'Finalize the checkout. Gateway handles payment authorization automatically. May return step_up_required if purchase exceeds limit.',
-          security: [{ oauth2: ['shopping'] }, { bearerAuth: [] }, { sessionId: [] }],
+          security: [{ oauth2: ['shopping'] }],
           parameters: [
             {
               name: 'session_id',
@@ -618,7 +617,7 @@ app.get('/openapi.json', (req, res) => {
           operationId: 'checkStepUpStatus',
           summary: 'Check step-up approval status',
           description: 'Poll until user approves or rejects the purchase in their wallet app.',
-          security: [{ oauth2: ['shopping'] }, { bearerAuth: [] }, { sessionId: [] }],
+          security: [{ oauth2: ['shopping'] }],
           parameters: [
             {
               name: 'session_id',
@@ -656,7 +655,7 @@ app.get('/openapi.json', (req, res) => {
         get: {
           operationId: 'getOrder',
           summary: 'Get order details',
-          security: [{ oauth2: ['shopping'] }, { bearerAuth: [] }, { sessionId: [] }],
+          security: [{ oauth2: ['shopping'] }],
           parameters: [
             {
               name: 'order_id',
@@ -682,7 +681,7 @@ app.get('/openapi.json', (req, res) => {
       securitySchemes: {
         oauth2: {
           type: 'oauth2',
-          description: 'OAuth 2.0 Authorization Code flow via WSIM wallet',
+          description: 'OAuth 2.0 Authorization Code flow via WSIM wallet. After authorization, tokens are automatically included.',
           flows: {
             authorizationCode: {
               authorizationUrl: `${wsimBaseUrl}/api/agent/v1/oauth/authorize`,
@@ -692,17 +691,6 @@ app.get('/openapi.json', (req, res) => {
               },
             },
           },
-        },
-        bearerAuth: {
-          type: 'http',
-          scheme: 'bearer',
-          description: 'Bearer token from WSIM OAuth',
-        },
-        sessionId: {
-          type: 'apiKey',
-          in: 'header',
-          name: 'X-Session-Id',
-          description: 'Session ID obtained from pairing code registration flow',
         },
       },
       schemas: {
@@ -745,7 +733,19 @@ app.get('/openapi.json', (req, res) => {
             cart: {
               type: 'object',
               properties: {
-                items: { type: 'array' },
+                items: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      product_id: { type: 'string' },
+                      name: { type: 'string' },
+                      quantity: { type: 'integer' },
+                      unit_price: { type: 'number' },
+                      total: { type: 'number' },
+                    },
+                  },
+                },
                 subtotal: { type: 'number' },
                 tax: { type: 'number' },
                 total: { type: 'number' },
@@ -760,7 +760,19 @@ app.get('/openapi.json', (req, res) => {
           properties: {
             order_id: { type: 'string' },
             status: { type: 'string' },
-            items: { type: 'array' },
+            items: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  product_id: { type: 'string' },
+                  name: { type: 'string' },
+                  quantity: { type: 'integer' },
+                  unit_price: { type: 'number' },
+                  total: { type: 'number' },
+                },
+              },
+            },
             total: { type: 'number' },
             currency: { type: 'string' },
             transaction_id: { type: 'string' },
@@ -1362,7 +1374,7 @@ app.listen(config.port, () => {
 ║  WSIM endpoint:     ${config.wsim.baseUrl.padEnd(35)}║
 ╠═══════════════════════════════════════════════════════════════╣
 ║  Endpoints:                                                   ║
-║    GET  /openapi.json    - OpenAPI 3.0 spec (ChatGPT Actions) ║
+║    GET  /openapi.json    - OpenAPI 3.1 spec (ChatGPT Actions) ║
 ║    GET  /tools           - List available tools               ║
 ║    POST /auth/register   - Register with pairing code         ║
 ║    GET  /auth/status/:id - Check registration status          ║

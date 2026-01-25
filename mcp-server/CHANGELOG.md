@@ -5,6 +5,15 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-01-25
+
+### Fixed
+- **OpenAPI spec ChatGPT compatibility**: Fixed validation errors preventing ChatGPT Actions import
+  - Upgraded OpenAPI version from 3.0.0 to 3.1.0
+  - Fixed server URL to always use HTTPS (`https://sacp.banksim.ca`)
+  - Added missing `items` property to array schemas (Checkout.cart.items, Order.items)
+  - Simplified to single OAuth2 security scheme (ChatGPT only supports one)
+
 ## [1.3.0] - 2026-01-25
 
 ### Added
