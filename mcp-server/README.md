@@ -121,6 +121,12 @@ npm run start:gateway
 ### Discovery
 
 ```bash
+# OpenAPI 3.0 spec (for ChatGPT Actions, Gemini Extensions)
+GET /openapi.json
+
+# ChatGPT plugin manifest
+GET /.well-known/ai-plugin.json
+
 # List available tools and endpoints
 GET /tools
 
@@ -128,7 +134,27 @@ GET /tools
 GET /health
 ```
 
-### Authentication (Pairing Flow)
+### Authentication
+
+The gateway supports **two authentication methods**:
+
+#### Option 1: OAuth 2.0 (Recommended for ChatGPT Connectors)
+
+Use WSIM's OAuth Authorization Code flow with PKCE:
+
+```bash
+# ChatGPT/Gemini handles OAuth automatically when configured as a connector
+# Authorization URL: https://wsim.banksim.ca/api/agent/v1/oauth/authorize
+# Token URL: https://wsim.banksim.ca/api/agent/v1/oauth/token
+
+# After OAuth, use the Bearer token:
+GET /checkout/sess_123
+Authorization: Bearer <wsim_access_token>
+```
+
+#### Option 2: Pairing Code Flow
+
+For manual testing or non-OAuth clients:
 
 ```bash
 # Step 1: User generates pairing code in mwsim app
@@ -148,6 +174,8 @@ GET /auth/status/:request_id
 
 # When approved, response includes session_id
 # Use session_id as X-Session-Id header for authenticated requests
+GET /checkout/sess_123
+X-Session-Id: sess_xxx
 ```
 
 ### Products (No Auth Required)
@@ -255,11 +283,12 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 
 ## Usage with ChatGPT/Gemini
 
-1. Deploy the HTTP Gateway (see DEPLOYMENT.md)
-2. Give the AI this prompt:
+**Production Gateway**: https://sacp.banksim.ca
+
+Give the AI this prompt:
 
 ```
-You can make purchases using the API at https://your-gateway-url.com
+You can make purchases using the API at https://sacp.banksim.ca
 
 To get started:
 1. GET /tools to see available operations

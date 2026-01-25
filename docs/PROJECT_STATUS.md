@@ -10,9 +10,9 @@
 
 | Metric | Status |
 |--------|--------|
-| Overall Project Health | :green_circle: **ON TRACK** |
+| Overall Project Health | :green_circle: **PRODUCTION READY** |
 | Design Sign-Off | **4 / 4 signed** ✅ (SSIM, WSIM, NSIM, BSIM) |
-| Implementation Progress | **WSIM v1.0.7 + SSIM v2.1.1 + NSIM v1.2.0 + BSIM v0.8.0 + mwsim P0 Complete** |
+| Implementation Progress | **WSIM v1.1.3 + SSIM v2.2.3 + NSIM v1.2.0 + BSIM v0.8.0 + mwsim P0 Complete** |
 | Dev Deployment | ✅ **ALL SERVICES DEPLOYED** (SSIM, BSIM, NewBank, WSIM, NSIM) |
 | Integration Testing | ✅ **ALL TESTS PASSING** |
 | Target Launch | TBD |
@@ -147,7 +147,7 @@
 | **Requirements Reviewed** | :white_check_mark: Complete |
 | **Estimate Confirmed** | :white_check_mark: ~6-8 weeks confirmed |
 | **Design Sign-Off** | ✅ **SIGNED OFF** |
-| **Implementation Status** | ✅ **v1.0.7 COMPLETE** |
+| **Implementation Status** | ✅ **v1.1.3 COMPLETE** (incl. RFC 8628 Device Auth) |
 | **Dev Deployment** | ✅ **DEPLOYED** (from `agentic-support` branch) |
 | **Integration Testing** | ✅ **ALL QA TESTS PASSING** |
 
@@ -656,6 +656,15 @@ Date: _______________
 | 3.9 | 2026-01-22 | WSIM Team | **WSIM v1.0.6 Q30 FIX IMPLEMENTED** - Added `card_token` to payment JWT. Requests BSIM card token before generating JWT (same pattern as human flow). Q30 fully resolved. |
 | 4.0 | 2026-01-22 | QA | **🎉 AGENT PAYMENTS WORKING IN DEV** - End-to-end agent payment flow verified. Transactions processing through full stack: Agent → SSIM → NSIM → BSIM. Agent badges visible in BSIM transaction history. Sprint 2 complete! |
 | 4.1 | 2026-01-22 | WSIM Team | **WSIM v1.0.7 DISCOVERY ENDPOINTS** - Added `/.well-known/openapi.json`, `/.well-known/agent-api`, `/.well-known/oauth-authorization-server`. External AI agents can now programmatically discover WSIM capabilities. |
+| 4.2 | 2026-01-22 | SSIM Team | **SSIM v2.2.0 DISCOVERY ENDPOINTS** - Added `wallet_provider` to UCP response for WSIM discovery. Added `GET /.well-known/openapi.json` endpoint. Added `GET /api/agent/v1/orders/:id` endpoint (was missing). Full agent API now documented and discoverable. |
+| 4.3 | 2026-01-24 | WSIM Team | **WSIM v1.1.3 RFC 8628 DEVICE AUTHORIZATION** - Added OAuth Device Authorization Grant (RFC 8628). New endpoints: `POST /oauth/device_authorization`, `POST /device-codes/claim`. Token endpoint extended with `device_code` grant type. Discovery endpoints updated. |
+| 4.4 | 2026-01-24 | SSIM Team | **SSIM v2.2.3 AI DISCOVERY ENDPOINTS** - Added `/.well-known/ai-plugin.json` (ChatGPT plugin manifest) and `/.well-known/mcp-server` (10 MCP tools). Fixed search_products to use `q` param. Made payment_token optional in complete_checkout. |
+| 4.5 | 2026-01-24 | PM | **PRODUCTION READY** - Both authorization flows (Device Auth RFC 8628 + Pairing Code) fully implemented. All standard AI discovery endpoints complete. External AI test prompts updated with both flows. |
+| 4.6 | 2026-01-24 | PM | **HTTP GATEWAY v1.1.0** - Added HTTP Gateway mode to MCP server (`src/http-gateway.ts`). Enables ChatGPT, Gemini, and any HTTP-capable AI to interact with SACP. REST API with session-based auth, automatic pairing flow, and `/execute` endpoint for MCP-style tool calls. Dockerfile updated for dual-mode deployment. |
+| 4.7 | 2026-01-25 | DevOps | **GATEWAY DEPLOYED TO PRODUCTION** - HTTP Gateway live at https://sacp.banksim.ca. Health check passing. External AI test prompts updated. |
+| 4.8 | 2026-01-25 | PM | **GATEWAY v1.2.0 OPENAPI SPEC** - Added `/openapi.json` (OpenAPI 3.0) and `/.well-known/ai-plugin.json` (ChatGPT plugin manifest) endpoints. Gateway now compatible with ChatGPT Actions and other OpenAPI-based LLM integrations. |
+| 4.9 | 2026-01-25 | WSIM Team | **WSIM v1.1.5 OAUTH AUTHORIZATION CODE** - Added browser-based OAuth Authorization Code flow with PKCE for ChatGPT Connectors. New endpoints: `GET /oauth/authorize` (consent page), `POST /oauth/authorize/identify`, token endpoint extended with `authorization_code` grant. Pre-registered clients: chatgpt, claude-mcp, gemini. |
+| 5.0 | 2026-01-25 | PM | **GATEWAY v1.3.0 DUAL AUTH SUPPORT** - Gateway now accepts both WSIM OAuth Bearer tokens (`Authorization: Bearer`) AND pairing code sessions (`X-Session-Id`). OpenAPI spec updated with OAuth2 security scheme pointing to WSIM. ChatGPT Connectors can now use standard OAuth flow. |
 
 ---
 
@@ -707,12 +716,12 @@ Date: _______________
 
 | Service | Health Endpoint | Status | Version |
 |---------|-----------------|--------|---------|
-| **SSIM** | ssim-dev.banksim.ca/health | ✅ Healthy | v2.1.1 |
-| **Regalmoose** | regalmoose.ca/health | ✅ Healthy | v2.1.1 |
-| **BSIM** | dev.banksim.ca/api/health | ✅ Healthy | v0.8.0 |
-| **NewBank** | newbank-dev.banksim.ca/health | ✅ Healthy | - |
-| **WSIM** | wsim-dev.banksim.ca/api/health | ✅ Healthy | v1.0.7 |
-| **NSIM** | payment-dev.banksim.ca/health | ✅ Healthy | - |
+| **SSIM** | ssim.banksim.ca/health | ✅ Production | v2.2.3 |
+| **Regalmoose** | regalmoose.ca/health | ✅ Production | v2.2.3 |
+| **BSIM** | banksim.ca/api/health | ✅ Production | v0.8.0 |
+| **NewBank** | newbank.banksim.ca/health | ✅ Production | - |
+| **WSIM** | wsim.banksim.ca/api/health | ✅ Production | v1.1.3 |
+| **NSIM** | payment.banksim.ca/health | ✅ Production | v1.2.0 |
 
 ### Integration Test Results (2026-01-22)
 
@@ -765,13 +774,14 @@ curl -sk https://ssim-dev.banksim.ca/.well-known/ucp
 
 | Team | Estimated Effort | Actual | Dependencies | Status |
 |------|------------------|--------|--------------|--------|
-| WSIM | 6-8 weeks | **2 days** | None | ✅ **v1.0.7 Complete** (incl. QA fixes + webhooks + Q30 fix + discovery) |
-| SSIM | 6-8 weeks | **2 days** | WSIM OAuth | ✅ **v2.1.1 Complete** (Sprint 1+2+Q30) |
+| WSIM | 6-8 weeks | **4 days** | None | ✅ **v1.1.5 Complete** (incl. RFC 8628 device auth + OAuth Authorization Code + all discovery endpoints) |
+| SSIM | 6-8 weeks | **3 days** | WSIM OAuth | ✅ **v2.2.3 Complete** (incl. ai-plugin.json + mcp-server) |
 | NSIM | 2 weeks | **1 day** | SSIM checkout | ✅ **v1.2.0 Complete** (P0+P1) |
 | BSIM | 1.5-2 weeks | **1 day** | NSIM context | ✅ **v0.8.0 Complete** |
 | mwsim | 3-4 weeks | **1 day** | WSIM APIs | ✅ **P0 Complete** |
+| MCP Gateway | 1 week | **2 days** | SSIM, WSIM | ✅ **v1.3.0 Complete** (MCP + HTTP Gateway + OAuth support) |
 | Integration | 1 week | **1 day** | All services | ✅ **All QA Tests Passing** |
-| **Total** | **~8 weeks** (parallel) | **2 days** | | **Sprint 1 Complete** |
+| **Total** | **~8 weeks** (parallel) | **4 days** | | **Production Ready** |
 
 ---
 

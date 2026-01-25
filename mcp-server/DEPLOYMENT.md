@@ -145,6 +145,10 @@ docker run -p 3000:3000 sacp-mcp node dist/http-gateway.js
 
 Push to: `ghcr.io/jordancrombie/sacp-gateway` (GitHub Container Registry)
 
+### Production URL
+
+**Live Gateway**: https://sacp.banksim.ca
+
 ---
 
 ## Buildkite Pipeline Requirements
@@ -308,10 +312,10 @@ metadata:
 spec:
   tls:
   - hosts:
-    - gateway.sacp.banksim.ca
+    - sacp.banksim.ca
     secretName: sacp-gateway-tls
   rules:
-  - host: gateway.sacp.banksim.ca
+  - host: sacp.banksim.ca
     http:
       paths:
       - path: /
