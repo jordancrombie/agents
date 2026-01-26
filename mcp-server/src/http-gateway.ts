@@ -12,8 +12,14 @@
 
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import { createRequire } from 'module';
 import { SsimClient, CartItem } from './clients/ssim.js';
 import { WsimClient } from './clients/wsim.js';
+
+// Import version from package.json
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json');
+const VERSION = pkg.version;
 
 const app = express();
 app.use(cors());
@@ -307,9 +313,14 @@ app.get('/tools', (req, res) => {
   });
 });
 
-// Health check
+// Health check with version for deployment validation
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    version: VERSION,
+    service: 'sacp-gateway',
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // OpenAPI spec for ChatGPT Actions and other LLM integrations
@@ -1503,7 +1514,7 @@ app.get('/checkout/:session_id/payment-status/:request_id', async (req, res) => 
 
       // First, get a payment token from WSIM using the access token
       const paymentTokenResponse = await fetch(
-        `${config.wsim.baseUrl}/api/agent/v1/payment-tokens`,
+        `${config.wsim.baseUrl}/api/agent/v1/payments/token`,
         {
           method: 'POST',
           headers: {
