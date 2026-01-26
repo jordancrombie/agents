@@ -2,7 +2,7 @@
 
 **Purpose**: Test the SACP protocol with an external AI (ChatGPT, Gemini, Claude, etc.)
 **Date**: 2026-01-26
-**Version**: 1.4.4
+**Version**: 1.4.5
 **Gateway URL**: https://sacp.banksim.ca
 **Prerequisites**:
 - Access to mwsim app for authorization approval
@@ -24,7 +24,7 @@
 
 ## Option A: Guest Checkout (Recommended)
 
-**New in v1.4.4!** The AI can browse, build a cart, and start checkout without any authentication. The user only needs to authorize when completing payment using RFC 8628 Device Authorization. Now supports push notifications and QR codes for easier authorization!
+**New in v1.4.5!** The AI can browse, build a cart, and start checkout without any authentication. The user only needs to authorize when completing payment using RFC 8628 Device Authorization. Now supports push notifications and server-generated QR codes for easier authorization!
 
 ### Instructions
 
@@ -91,7 +91,8 @@ Since this is a guest checkout (no session), you'll get:
 {
   "status": "authorization_required",
   "notification_sent": true/false,    // Did the user get a push notification?
-  "authorization_url": "https://...", // URL with code pre-filled (use for QR code)
+  "authorization_url": "https://...", // URL with code pre-filled
+  "qr_code_data_url": "data:image/png;base64,...", // Ready-to-display QR code image
   "user_code": "WSIM-A3J2K9",         // Manual code entry
   "verification_uri": "https://wsim.banksim.ca/device",
   "request_id": "...",
@@ -101,8 +102,8 @@ Since this is a guest checkout (no session), you'll get:
 
 Based on `notification_sent`:
 - **If TRUE**: Tell me "Check your phone - I sent a payment request to your wallet app"
-- **If FALSE**: Offer me these options:
-  1. "I can display a QR code for you to scan" (generate QR from `authorization_url`)
+- **If FALSE**: Display the QR code and offer manual entry:
+  1. Show the QR code: `![Scan to pay](qr_code_data_url)` - this is a ready-to-scan image
   2. "Or enter code WSIM-XXXXXX in your wallet app at [verification_uri]"
 
 ### Step 5: Poll for Payment Status
@@ -489,7 +490,7 @@ Begin now by discovering the store at https://ssim.banksim.ca/.well-known/ucp
 | Method | When Available | User Action |
 |--------|----------------|-------------|
 | Push Notification | `notification_sent: true` | Tap notification on phone |
-| QR Code | Always | Scan QR code generated from `authorization_url` |
+| QR Code | Always | Scan `qr_code_data_url` (server-generated, ready to display) |
 | Manual Code | Always | Enter `WSIM-XXXXXX` at `verification_uri` |
 
 ### Gateway with Auth (Option B)

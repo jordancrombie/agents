@@ -2,14 +2,14 @@
 
 **Purpose**: Enable external AI agents to discover, register, and transact with SACP services
 **Date**: 2026-01-26
-**Version**: 1.4.4
+**Version**: 1.4.5
 **Target AIs**: ChatGPT, Gemini, Claude, or any AI with HTTP request capabilities
 
 ---
 
 ## Quick Start Prompt (Guest Checkout - Recommended)
 
-**New in v1.4.4!** No upfront authentication required. The user only authorizes at payment time. Now with push notifications and QR code support!
+**New in v1.4.5!** No upfront authentication required. The user only authorizes at payment time. Now with push notifications and server-generated QR code support!
 
 Copy and paste this prompt into your AI:
 
@@ -63,7 +63,8 @@ You'll receive:
 {
   "status": "authorization_required",
   "notification_sent": true/false,    // Did the user get a push notification?
-  "authorization_url": "https://...", // URL with code pre-filled (use for QR code)
+  "authorization_url": "https://...", // URL with code pre-filled
+  "qr_code_data_url": "data:image/png;base64,...", // Ready-to-display QR code
   "user_code": "WSIM-A3J2K9",         // Manual code entry
   "verification_uri": "https://wsim.banksim.ca/device",
   "request_id": "...",
@@ -72,8 +73,8 @@ You'll receive:
 
 Based on `notification_sent`:
 - **If TRUE**: Tell me "Check your phone - I sent a payment request to your wallet app"
-- **If FALSE**: Offer me these options:
-  1. "I can display a QR code for you to scan" (generate QR from `authorization_url`)
+- **If FALSE**: Display the QR code and offer manual entry:
+  1. Show QR: `![Scan to pay](qr_code_data_url)` - this is a ready-to-scan image
   2. "Or enter code WSIM-XXXXXX in your wallet app at [verification_uri]"
 
 ### Step 5: Poll for Payment Status
@@ -98,7 +99,7 @@ Poll every 5 seconds:
 - All prices are in CAD (Canadian dollars)
 - No authentication needed until payment time
 - User codes expire in 15 minutes
-- If you can generate QR codes, the `authorization_url` makes authorization easier for users
+- The `qr_code_data_url` field contains a ready-to-display QR code image - just use markdown to show it
 
 ## Begin
 

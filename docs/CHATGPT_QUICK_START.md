@@ -2,7 +2,7 @@
 
 Copy and paste the prompt below into ChatGPT (Plus with browsing) or Gemini Advanced.
 
-**v1.4.4 Update**: Guest checkout now supports push notifications and QR codes! If you provide a real email, you may receive a push notification to your phone. Otherwise, you can scan a QR code or enter a code manually.
+**v1.4.5 Update**: Guest checkout now supports push notifications and server-generated QR codes! If you provide a real email, you may receive a push notification to your phone. Otherwise, the AI displays a ready-to-scan QR code or you can enter a code manually.
 
 ---
 
@@ -44,7 +44,8 @@ The response tells you how the user should authorize payment:
 {
   "status": "authorization_required",
   "notification_sent": true/false,    // Did the user get a push notification?
-  "authorization_url": "https://...", // URL with code pre-filled (use for QR code)
+  "authorization_url": "https://...", // URL with code pre-filled
+  "qr_code_data_url": "data:image/png;base64,...", // Ready-to-display QR code
   "user_code": "WSIM-A3J2K9",         // Manual code entry
   "verification_uri": "https://...",  // Where to enter code
   "poll_endpoint": "/checkout/.../payment-status/...",
@@ -53,8 +54,8 @@ The response tells you how the user should authorize payment:
 
 Based on the response:
 - If notification_sent is TRUE: Tell me "Check your phone - I sent a payment request to your wallet app"
-- If notification_sent is FALSE: Offer me these options:
-  1. "I can display a QR code for you to scan" (generate QR from authorization_url)
+- If notification_sent is FALSE: Display the QR code and offer manual entry:
+  1. Show QR: `![Scan to pay](qr_code_data_url)` - this is a ready-to-scan image
   2. "Or enter code WSIM-XXXXXX in your wallet app"
 
 STEP 5 - Poll for payment:
@@ -99,7 +100,7 @@ Start by showing me the products!
 | **QR Code** | Always | Scan QR code with mwsim app |
 | **Manual Code** | Always | Enter `WSIM-XXXXXX` in mwsim |
 
-The AI can generate a QR code from `authorization_url` if you prefer scanning over typing.
+The Gateway generates a ready-to-display QR code in `qr_code_data_url` - the AI just displays it with markdown.
 
 ---
 
