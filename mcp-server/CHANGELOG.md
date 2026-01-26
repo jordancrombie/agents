@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Allows WSIM to skip code/email entry and go directly to waiting page
   - Graceful degradation: if secret not set or no email, flow works as before
 
+### Fixed
+- **GPT Authorization Instructions**: Fixed documentation to use correct URL fields
+  - Always use `authorization_url` for user-facing links (has code pre-filled)
+  - Never direct users to `verification_uri` (base URL without code)
+  - Always provide fallback options (QR code + clickable link) even when push notification sent
+  - Added URL Field Reference table to clarify field purposes
+
 ## [1.4.6] - 2026-01-26
 
 ### Fixed
