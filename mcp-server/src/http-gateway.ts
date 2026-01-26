@@ -12,6 +12,7 @@
 
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import crypto from 'crypto';
 import { createRequire } from 'module';
 import QRCode from 'qrcode';
 import { SsimClient, CartItem } from './clients/ssim.js';
@@ -42,6 +43,26 @@ const config = {
     baseUrl: process.env.GATEWAY_BASE_URL || 'https://sacp.banksim.ca',
   },
 };
+
+/**
+ * Create a signed token for optimized web fallback flow.
+ * When appended to verification_uri_complete, WSIM can skip code/email entry
+ * and go directly to the waiting page.
+ *
+ * Token format: base64url(email).base64url(hmac_signature)
+ * Signature input: "email:code" (e.g., "user@example.com:WSIM-FQHJCG")
+ */
+function createDeviceAuthToken(email: string, code: string): string {
+  const secret = process.env.INTERNAL_API_SECRET;
+  if (!secret) return '';
+
+  const emailB64 = Buffer.from(email).toString('base64url');
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(`${email}:${code}`)
+    .digest('base64url');
+  return `${emailB64}.${signature}`;
+}
 
 // Session storage (in-memory for demo, use Redis for production)
 interface Session {
@@ -1441,8 +1462,15 @@ app.post('/checkout/:session_id/complete', async (req, res) => {
     // Format amount for display (cents to dollars)
     const displayAmount = `${checkout.cart.currency} ${(checkout.cart.total / 100).toFixed(2)}`;
 
-    // Generate QR code for the authorization URL
-    const authorizationUrl = deviceAuth.verification_uri_complete || deviceAuth.verification_uri;
+    // Build authorization URL, optionally with signed token for optimized web flow
+    // When token is present, WSIM can skip code/email entry and go straight to waiting page
+    let authorizationUrl = deviceAuth.verification_uri_complete || deviceAuth.verification_uri;
+    if (process.env.INTERNAL_API_SECRET && checkout.buyer?.email && deviceAuth.user_code) {
+      const token = createDeviceAuthToken(checkout.buyer.email, deviceAuth.user_code);
+      if (token) {
+        authorizationUrl = `${authorizationUrl}&t=${token}`;
+      }
+    }
     let qrCodeBuffer: Buffer | undefined;
     try {
       qrCodeBuffer = await QRCode.toBuffer(authorizationUrl, {

@@ -5,6 +5,15 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.7] - 2026-01-26
+
+### Added
+- **Optimized Web Fallback**: Authorization URL now includes signed token for streamlined web flow
+  - Appends `&t=<token>` to `verification_uri_complete` when buyer email is available
+  - Token format: `base64url(email).hmac_signature` signed with `INTERNAL_API_SECRET`
+  - Allows WSIM to skip code/email entry and go directly to waiting page
+  - Graceful degradation: if secret not set or no email, flow works as before
+
 ## [1.4.6] - 2026-01-26
 
 ### Fixed
