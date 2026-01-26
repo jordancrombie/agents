@@ -1343,8 +1343,9 @@ app.post('/checkout/:session_id/complete', async (req, res) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           client_id: config.gateway.clientId,
-          agent_name: 'SACP Gateway',
-          scope: 'payment',
+          agent_name: 'SACP Gateway Guest Checkout',
+          agent_description: `Payment authorization for checkout ${session_id}`,
+          permissions: ['browse', 'cart', 'purchase'],
           spending_limits: {
             per_transaction: checkout.cart.total,
             currency: checkout.cart.currency,
