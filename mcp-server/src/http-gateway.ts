@@ -287,7 +287,7 @@ async function getClients(session: Session): Promise<{ wsim: WsimClient; ssim: S
 app.get('/tools', (req, res) => {
   res.json({
     name: 'SACP Agent Gateway',
-    version: '1.4.0',
+    version: '1.4.5',
     description: 'HTTP gateway for AI agents to browse and purchase from SimToolBox stores',
     base_url: `${req.protocol}://${req.get('host')}`,
     authentication: {
@@ -340,7 +340,7 @@ app.get('/openapi.json', (req, res) => {
 **Two Authentication Options:**
 
 Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the OAuth flow automatically when configured as a connector.`,
-      version: '1.4.0',
+      version: '1.4.5',
       contact: {
         name: 'SimToolBox',
         url: 'https://simtoolbox.com',
