@@ -2,7 +2,7 @@
 
 Copy and paste the prompt below into ChatGPT (Plus with browsing) or Gemini Advanced.
 
-**v1.4.6 Update**: Guest checkout now supports push notifications and server-generated QR codes! If you provide a real email, you may receive a push notification to your phone. Otherwise, the AI displays a ready-to-scan QR code or you can enter a code manually.
+**v1.4.7 Update**: Guest checkout now supports push notifications and server-generated QR codes! Always provide fallback options (QR code + clickable link) even when push notification is sent. Use `authorization_url` for user-facing links (has code pre-filled).
 
 ---
 
@@ -53,10 +53,10 @@ The response tells you how the user should authorize payment:
 }
 
 Based on the response:
-- If notification_sent is TRUE: Tell me "Check your phone - I sent a payment request to your wallet app"
-- If notification_sent is FALSE: Display the QR code and offer manual entry:
-  1. Show QR: `![Scan to pay](qr_code_url)` - this is a ready-to-scan image
-  2. "Or enter code WSIM-XXXXXX in your wallet app"
+- If notification_sent is TRUE: Tell me "Check your phone" but ALWAYS offer fallbacks too
+- If notification_sent is FALSE: QR code and link are the primary options
+- ALWAYS show: QR code `![Scan to pay](qr_code_url)` AND clickable link `[click here](authorization_url)`
+- IMPORTANT: Use `authorization_url` for links (has code pre-filled), never `verification_uri`
 
 STEP 5 - Poll for payment:
 GET https://sacp.banksim.ca/checkout/<checkout_session_id>/payment-status/<request_id>
@@ -98,6 +98,7 @@ Start by showing me the products!
 |--------|----------------|-------------|
 | **Push Notification** | `notification_sent: true` | Tap notification on phone |
 | **QR Code** | Always | Scan QR code with mwsim app |
+| **Clickable Link** | Always | Click `authorization_url` (code pre-filled) |
 | **Manual Code** | Always | Enter `WSIM-XXXXXX` in mwsim |
 
 The Gateway generates a ready-to-display QR code in `qr_code_url` - the AI just displays it with markdown.
