@@ -1,15 +1,15 @@
 # AI Agent Onboarding Prompt
 
 **Purpose**: Enable external AI agents to discover, register, and transact with SACP services
-**Date**: 2026-01-25
-**Version**: 1.4.0
+**Date**: 2026-01-26
+**Version**: 1.4.4
 **Target AIs**: ChatGPT, Gemini, Claude, or any AI with HTTP request capabilities
 
 ---
 
 ## Quick Start Prompt (Guest Checkout - Recommended)
 
-**New in v1.4.0!** No upfront authentication required. The user only authorizes at payment time.
+**New in v1.4.4!** No upfront authentication required. The user only authorizes at payment time. Now with push notifications and QR code support!
 
 Copy and paste this prompt into your AI:
 
@@ -62,13 +62,19 @@ Content-Type: application/json
 You'll receive:
 {
   "status": "authorization_required",
-  "user_code": "WSIM-A3J2K9",
+  "notification_sent": true/false,    // Did the user get a push notification?
+  "authorization_url": "https://...", // URL with code pre-filled (use for QR code)
+  "user_code": "WSIM-A3J2K9",         // Manual code entry
   "verification_uri": "https://wsim.banksim.ca/device",
   "request_id": "...",
   "expires_in": 900
 }
 
-Tell me the `user_code` - I'll enter it in my wallet app to authorize the payment.
+Based on `notification_sent`:
+- **If TRUE**: Tell me "Check your phone - I sent a payment request to your wallet app"
+- **If FALSE**: Offer me these options:
+  1. "I can display a QR code for you to scan" (generate QR from `authorization_url`)
+  2. "Or enter code WSIM-XXXXXX in your wallet app at [verification_uri]"
 
 ### Step 5: Poll for Payment Status
 GET https://sacp.banksim.ca/checkout/<checkout_session_id>/payment-status/<request_id>
@@ -79,11 +85,20 @@ Poll every 5 seconds:
 - `{"status": "denied"}` - I rejected it
 - `{"status": "expired"}` - Code expired, restart checkout
 
+## Authorization Options
+
+| Method | When Available | User Action |
+|--------|----------------|-------------|
+| **Push Notification** | `notification_sent: true` | Tap notification on phone |
+| **QR Code** | Always | Scan QR code generated from `authorization_url` |
+| **Manual Code** | Always | Enter `WSIM-XXXXXX` at `verification_uri` |
+
 ## Important Notes
 
 - All prices are in CAD (Canadian dollars)
 - No authentication needed until payment time
 - User codes expire in 15 minutes
+- If you can generate QR codes, the `authorization_url` makes authorization easier for users
 
 ## Begin
 

@@ -2,7 +2,7 @@
 
 Copy and paste the prompt below into ChatGPT (Plus with browsing) or Gemini Advanced.
 
-**v1.4.0 Update**: Guest checkout is now supported! No upfront authentication required - you only need to authorize when completing payment.
+**v1.4.4 Update**: Guest checkout now supports push notifications and QR codes! If you provide a real email, you may receive a push notification to your phone. Otherwise, you can scan a QR code or enter a code manually.
 
 ---
 
@@ -40,9 +40,22 @@ STEP 4 - Complete purchase:
 POST https://sacp.banksim.ca/checkout/<checkout_session_id>/complete
 Content-Type: application/json
 
-This returns status "authorization_required" with:
-- user_code (e.g., "WSIM-A3J2K9") - I'll enter this in my wallet app
-- request_id - Use this to poll for payment status
+The response tells you how the user should authorize payment:
+{
+  "status": "authorization_required",
+  "notification_sent": true/false,    // Did the user get a push notification?
+  "authorization_url": "https://...", // URL with code pre-filled (use for QR code)
+  "user_code": "WSIM-A3J2K9",         // Manual code entry
+  "verification_uri": "https://...",  // Where to enter code
+  "poll_endpoint": "/checkout/.../payment-status/...",
+  "expires_in": 900
+}
+
+Based on the response:
+- If notification_sent is TRUE: Tell me "Check your phone - I sent a payment request to your wallet app"
+- If notification_sent is FALSE: Offer me these options:
+  1. "I can display a QR code for you to scan" (generate QR from authorization_url)
+  2. "Or enter code WSIM-XXXXXX in your wallet app"
 
 STEP 5 - Poll for payment:
 GET https://sacp.banksim.ca/checkout/<checkout_session_id>/payment-status/<request_id>
@@ -66,10 +79,27 @@ Start by showing me the products!
 1. Paste the prompt → AI shows products
 2. Pick something → AI creates checkout (no auth needed!)
 3. AI adds your info and completes checkout
-4. AI shows you a user code (e.g., `WSIM-A3J2K9`)
-5. Open mwsim → Agents → Enter Code → Enter the code → Approve
+4. AI shows authorization options based on `notification_sent`:
+   - **If TRUE**: "Check your phone" - you'll get a push notification
+   - **If FALSE**: AI offers QR code or manual code entry
+5. Authorize in mwsim:
+   - **Push**: Tap notification → Approve
+   - **QR**: Open mwsim → Scan QR code → Approve
+   - **Manual**: Agents → Authorize → Enter code (e.g., `WSIM-A3J2K9`) → Approve
 6. AI polls and shows order confirmation
 7. Verify the order in BSIM (look for 🤖 agent badge)
+
+---
+
+## Authorization Options
+
+| Method | When Available | User Action |
+|--------|----------------|-------------|
+| **Push Notification** | `notification_sent: true` | Tap notification on phone |
+| **QR Code** | Always | Scan QR code with mwsim app |
+| **Manual Code** | Always | Enter `WSIM-XXXXXX` in mwsim |
+
+The AI can generate a QR code from `authorization_url` if you prefer scanning over typing.
 
 ---
 

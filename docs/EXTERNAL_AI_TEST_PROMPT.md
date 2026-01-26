@@ -1,8 +1,8 @@
 # External AI Agent Test Prompt
 
 **Purpose**: Test the SACP protocol with an external AI (ChatGPT, Gemini, Claude, etc.)
-**Date**: 2026-01-25
-**Version**: 1.4.0
+**Date**: 2026-01-26
+**Version**: 1.4.4
 **Gateway URL**: https://sacp.banksim.ca
 **Prerequisites**:
 - Access to mwsim app for authorization approval
@@ -24,15 +24,18 @@
 
 ## Option A: Guest Checkout (Recommended)
 
-**New in v1.4.0!** The AI can browse, build a cart, and start checkout without any authentication. The user only needs to authorize when completing payment using RFC 8628 Device Authorization.
+**New in v1.4.4!** The AI can browse, build a cart, and start checkout without any authentication. The user only needs to authorize when completing payment using RFC 8628 Device Authorization. Now supports push notifications and QR codes for easier authorization!
 
 ### Instructions
 
 1. Copy the prompt below and paste it into ChatGPT, Gemini, or another AI
 2. Browse and select products
 3. AI creates checkout and asks for payment authorization
-4. Enter the user code in mwsim app (Agents > Enter Code)
-5. Approve the payment
+4. Authorize the payment using one of three methods:
+   - **Push notification** (if you provided a real email and have mwsim installed)
+   - **QR code** (scan with mwsim app)
+   - **Manual code entry** (Agents > Enter Code in mwsim)
+5. Approve the payment in mwsim
 6. AI completes the purchase
 
 ### Prompt
@@ -87,14 +90,20 @@ Since this is a guest checkout (no session), you'll get:
 ```json
 {
   "status": "authorization_required",
-  "user_code": "WSIM-A3J2K9",
+  "notification_sent": true/false,    // Did the user get a push notification?
+  "authorization_url": "https://...", // URL with code pre-filled (use for QR code)
+  "user_code": "WSIM-A3J2K9",         // Manual code entry
   "verification_uri": "https://wsim.banksim.ca/device",
   "request_id": "...",
   "expires_in": 900
 }
 ```
 
-Tell me the `user_code` - I'll enter it in my wallet app and approve the payment.
+Based on `notification_sent`:
+- **If TRUE**: Tell me "Check your phone - I sent a payment request to your wallet app"
+- **If FALSE**: Offer me these options:
+  1. "I can display a QR code for you to scan" (generate QR from `authorization_url`)
+  2. "Or enter code WSIM-XXXXXX in your wallet app at [verification_uri]"
 
 ### Step 5: Poll for Payment Status
 GET https://sacp.banksim.ca/checkout/<checkout_session_id>/payment-status/<request_id>
@@ -111,8 +120,8 @@ Poll every 5 seconds. You'll see:
 2. Show me what's available
 3. When I pick something, create a checkout
 4. Add my shipping info
-5. Complete checkout - you'll get a user code
-6. Give me the code, I'll authorize in my wallet
+5. Complete checkout - check the authorization response
+6. Based on `notification_sent`, either tell me to check my phone OR offer QR code/manual code options
 7. Poll for payment status and show me the order confirmation
 
 Begin now!
@@ -470,9 +479,18 @@ Begin now by discovering the store at https://ssim.banksim.ca/.well-known/ucp
 | 3 | Creates checkout | - |
 | 4 | Adds buyer info | - |
 | 5 | Completes checkout | - |
-| 6 | Shows user code | Enter code in mwsim |
-| 7 | Polls payment status | Approve payment |
-| 8 | Shows confirmation | Verify in BSIM |
+| 6 | Checks `notification_sent` response | - |
+| 7a | If TRUE: "Check your phone" | Tap push notification |
+| 7b | If FALSE: Offers QR code or manual code | Scan QR OR enter code in mwsim |
+| 8 | Polls payment status | Approve payment |
+| 9 | Shows confirmation | Verify in BSIM |
+
+**Authorization Methods:**
+| Method | When Available | User Action |
+|--------|----------------|-------------|
+| Push Notification | `notification_sent: true` | Tap notification on phone |
+| QR Code | Always | Scan QR code generated from `authorization_url` |
+| Manual Code | Always | Enter `WSIM-XXXXXX` at `verification_uri` |
 
 ### Gateway with Auth (Option B)
 | Step | AI Action | User Action |

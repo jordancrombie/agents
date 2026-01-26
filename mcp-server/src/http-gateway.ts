@@ -858,7 +858,7 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
           description: 'Returned when user must authorize payment in their wallet app',
           properties: {
             status: { type: 'string', enum: ['authorization_required'] },
-            authorization_url: { type: 'string', description: 'URL for user to authorize payment' },
+            authorization_url: { type: 'string', description: 'URL with code pre-filled - use this to generate a QR code for the user to scan' },
             user_code: { type: 'string', description: 'Short code user can enter in wallet app (e.g., WSIM-A3J2K9)' },
             verification_uri: { type: 'string', description: 'URL where user can enter the code' },
             poll_endpoint: { type: 'string', description: 'Endpoint to poll for authorization status' },
