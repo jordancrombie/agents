@@ -863,6 +863,7 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
             verification_uri: { type: 'string', description: 'URL where user can enter the code' },
             poll_endpoint: { type: 'string', description: 'Endpoint to poll for authorization status' },
             expires_in: { type: 'integer', description: 'Seconds until authorization request expires' },
+            notification_sent: { type: 'boolean', description: 'True if a push notification was sent to the user\'s device (based on buyer_email lookup)' },
             message: { type: 'string', description: 'Human-readable message for the user' },
           },
         },
@@ -1348,13 +1349,14 @@ app.post('/checkout/:session_id/complete', async (req, res) => {
     // Guest checkout - initiate Device Authorization Grant (RFC 8628)
     // Call WSIM device_authorization endpoint
     // Per WSIM team: scope is space-separated string, no client_id needed
+    // If buyer_email is provided, WSIM will attempt to send a push notification (v1.2.5+)
     const deviceAuthResponse = await fetch(
       `${config.wsim.baseUrl}/api/agent/v1/oauth/device_authorization`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          agent_name: 'SACP Gateway Guest Checkout',
+          agent_name: checkout.merchant?.name || 'SACP Gateway',
           agent_description: `Payment authorization for checkout ${session_id}`,
           scope: 'browse cart purchase',
           response_type: 'token', // Request access token directly (not credentials)
@@ -1362,6 +1364,7 @@ app.post('/checkout/:session_id/complete', async (req, res) => {
             per_transaction: checkout.cart.total,
             currency: checkout.cart.currency,
           },
+          buyer_email: checkout.buyer?.email, // WSIM will send push notification if user found
         }),
       }
     );
@@ -1377,6 +1380,9 @@ app.post('/checkout/:session_id/complete', async (req, res) => {
     }
 
     const deviceAuth = await deviceAuthResponse.json();
+
+    // Check if WSIM sent a push notification (v1.2.5+)
+    const notificationSent = deviceAuth.notification_sent === true;
 
     // Generate a request ID for tracking
     const requestId = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
@@ -1396,7 +1402,11 @@ app.post('/checkout/:session_id/complete', async (req, res) => {
     };
     pendingDeviceAuths.set(requestId, pendingAuth);
 
+    // Format amount for display (cents to dollars)
+    const displayAmount = `${checkout.cart.currency} ${(checkout.cart.total / 100).toFixed(2)}`;
+
     // Return 202 with authorization required response
+    // Message varies based on whether push notification was sent
     return res.status(202).json({
       status: 'authorization_required',
       authorization_url: deviceAuth.verification_uri_complete || deviceAuth.verification_uri,
@@ -1404,7 +1414,10 @@ app.post('/checkout/:session_id/complete', async (req, res) => {
       verification_uri: deviceAuth.verification_uri,
       poll_endpoint: `/checkout/${session_id}/payment-status/${requestId}`,
       expires_in: deviceAuth.expires_in || 300,
-      message: `To complete your purchase of ${(checkout.cart.total / 100).toFixed(2)} ${checkout.cart.currency}, please enter code ${deviceAuth.user_code} at ${deviceAuth.verification_uri} or open the link in your wallet app.`,
+      notification_sent: notificationSent,
+      message: notificationSent
+        ? `We've sent a payment request to your phone. Check your WSIM app to approve the ${displayAmount} payment. If you don't see it, enter code ${deviceAuth.user_code} at ${deviceAuth.verification_uri}.`
+        : `To complete your purchase of ${displayAmount}, please enter code ${deviceAuth.user_code} at ${deviceAuth.verification_uri} or open the link in your wallet app.`,
     });
   } catch (error) {
     console.error('Complete checkout error:', error);

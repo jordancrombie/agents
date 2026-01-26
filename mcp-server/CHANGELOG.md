@@ -5,6 +5,24 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.4] - 2026-01-26
+
+### Added
+- **Push Notification Support**: Guest checkout now supports push notifications for known users
+  - Passes `buyer_email` to WSIM device authorization endpoint
+  - WSIM looks up user by email and sends push notification if found (v1.2.5+)
+  - Returns `notification_sent: true/false` in authorization response
+  - AI agents can adjust messaging based on whether push was sent
+  - Fallback to manual code entry always available
+- **Merchant Name in Notifications**: Device authorization now uses merchant name from checkout
+  - Uses `checkout.merchant?.name` if available, falls back to `"SACP Gateway"`
+  - Improves push notification UX with actual store name
+
+### Changed
+- `AuthorizationRequired` response now includes `notification_sent` boolean field
+- Authorization message varies based on push notification status
+- OpenAPI spec updated with `notification_sent` field documentation
+
 ## [1.4.3] - 2026-01-26
 
 ### Added
