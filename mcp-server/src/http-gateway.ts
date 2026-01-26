@@ -1336,19 +1336,16 @@ app.post('/checkout/:session_id/complete', async (req, res) => {
 
     // Guest checkout - initiate Device Authorization Grant (RFC 8628)
     // Call WSIM device_authorization endpoint
-    // WSIM accepts both 'scope' (OAuth standard) and 'permissions' (array format)
-    // Try both to maximize compatibility
+    // Per WSIM team: scope is space-separated string, no client_id needed
     const deviceAuthResponse = await fetch(
       `${config.wsim.baseUrl}/api/agent/v1/oauth/device_authorization`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          client_id: config.gateway.clientId,
           agent_name: 'SACP Gateway Guest Checkout',
           agent_description: `Payment authorization for checkout ${session_id}`,
-          scope: 'purchase',
-          permissions: ['browse', 'cart', 'purchase'],
+          scope: 'browse cart purchase',
           spending_limits: {
             per_transaction: checkout.cart.total,
             currency: checkout.cart.currency,
