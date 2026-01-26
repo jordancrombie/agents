@@ -206,7 +206,7 @@ const tools = [
   },
   {
     name: 'complete_checkout',
-    description: 'Complete checkout - automatically gets payment token and finalizes purchase',
+    description: 'Complete checkout. Returns authorization_required with user_code and notification_sent. If notification_sent=true, tell user to check their phone. If false, offer QR code (from authorization_url) or manual code entry. Then poll payment-status until approved.',
     endpoint: 'POST /checkout/:session_id/complete',
     parameters: {
       session_id: { type: 'string', required: true },
@@ -612,7 +612,7 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
         post: {
           operationId: 'completeCheckout',
           summary: 'Complete the purchase',
-          description: 'Finalize the checkout. For guest checkout (no Bearer token), returns authorization_required with a user code and URL for the user to approve payment in their wallet app. Poll the payment-status endpoint until approved.',
+          description: 'Finalize the checkout. Returns 202 with authorization_required for guest checkout. AI BEHAVIOR: Check the notification_sent field in the response. If TRUE, tell user "Check your phone - I sent a payment request to your wallet app." If FALSE, offer two options: (1) "I can display a QR code for you to scan" using authorization_url, or (2) "Enter code [user_code] at [verification_uri]." Then poll the poll_endpoint every 5 seconds until status becomes approved.',
           security: [],
           parameters: [
             {
@@ -640,7 +640,7 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
               },
             },
             '202': {
-              description: 'Payment authorization required - user must approve in wallet app',
+              description: 'Payment authorization required. AI: Check notification_sent to determine how to guide the user (push notification vs QR code vs manual code entry).',
               content: {
                 'application/json': {
                   schema: { $ref: '#/components/schemas/AuthorizationRequired' },
@@ -855,16 +855,16 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
         },
         AuthorizationRequired: {
           type: 'object',
-          description: 'Returned when user must authorize payment in their wallet app',
+          description: 'Returned when user must authorize payment in their wallet app. AI BEHAVIOR: Check notification_sent first. If TRUE, tell user to check their phone for a push notification. If FALSE, offer the user two options: (1) display a QR code generated from authorization_url, or (2) manually enter user_code at verification_uri. Then poll poll_endpoint every 5 seconds until approved.',
           properties: {
             status: { type: 'string', enum: ['authorization_required'] },
-            authorization_url: { type: 'string', description: 'URL with code pre-filled - use this to generate a QR code for the user to scan' },
-            user_code: { type: 'string', description: 'Short code user can enter in wallet app (e.g., WSIM-A3J2K9)' },
-            verification_uri: { type: 'string', description: 'URL where user can enter the code' },
-            poll_endpoint: { type: 'string', description: 'Endpoint to poll for authorization status' },
-            expires_in: { type: 'integer', description: 'Seconds until authorization request expires' },
-            notification_sent: { type: 'boolean', description: 'True if a push notification was sent to the user\'s device (based on buyer_email lookup)' },
-            message: { type: 'string', description: 'Human-readable message for the user' },
+            authorization_url: { type: 'string', description: 'URL with user_code pre-filled. AI: Generate a QR code from this URL if user prefers scanning over typing.' },
+            user_code: { type: 'string', description: 'Short code (e.g., WSIM-A3J2K9) user can enter manually in their wallet app.' },
+            verification_uri: { type: 'string', description: 'URL where user can manually enter the user_code.' },
+            poll_endpoint: { type: 'string', description: 'Endpoint to poll for authorization status. AI: Poll every 5 seconds until status is approved, denied, or expired.' },
+            expires_in: { type: 'integer', description: 'Seconds until authorization request expires (typically 900 = 15 minutes).' },
+            notification_sent: { type: 'boolean', description: 'TRUE = push notification sent to user phone (tell them to check their phone). FALSE = no notification sent (offer QR code or manual code entry).' },
+            message: { type: 'string', description: 'Human-readable message to show the user.' },
           },
         },
         PaymentStatus: {
