@@ -2,9 +2,102 @@
 
 **Author**: PM
 **Date**: 2026-01-25
-**Status**: 🟡 BLOCKED - Awaiting SSIM Change (Option A)
+**Status**: 🟢 READY FOR TESTING - All code changes complete
 **Target Release**: Gateway v1.4.0
-**Last Updated**: 2026-01-25 (Architecture Decision: Option A confirmed - SSIM to make session endpoints unauthenticated)
+**Last Updated**: 2026-01-26
+
+---
+
+## 🔴 Current Blockers (2026-01-26)
+
+| Blocker | Owner | Issue | Resolution |
+|---------|-------|-------|------------|
+| ~~**WSIM device code endpoint 404**~~ | WSIM Team | ~~mwsim code entry screen exists, but submitting code returns 404~~ | ✅ **FIXED in v1.2.2/v1.2.3** - Added route alias + web flow |
+| ~~**Token response mismatch**~~ | WSIM Team | ~~Token endpoint returns agent credentials instead of access token~~ | ✅ **FIXED in v1.2.4** - Added `response_type=token` param |
+| **Push notification not implemented** | WSIM Team | WSIM has buyer email - could push directly instead of requiring code entry | Enhancement: Use email to lookup user and send push |
+
+**Testing Status**: All code changes complete. Ready for end-to-end testing.
+
+---
+
+## 🔴 Token Response Mismatch (NEW - 2026-01-26)
+
+### The Issue
+
+When a user approves a guest checkout via the device code flow, WSIM's `/api/agent/v1/oauth/token` endpoint returns **agent credentials** instead of an **access token**.
+
+**WSIM returns** (when status is 'approved'):
+```json
+{
+  "client_id": "agent_xyz",
+  "client_secret": "secret_abc",
+  "token_endpoint": "https://wsim.banksim.ca/api/agent/v1/oauth/token",
+  "permissions": ["payment:initiate"],
+  "spending_limits": { ... }
+}
+```
+
+**Gateway expects** (per RFC 8628 Section 3.5):
+```json
+{
+  "access_token": "eyJ...",
+  "token_type": "Bearer",
+  "expires_in": 3600
+}
+```
+
+### Why This Happens
+
+WSIM's device code flow was designed for **agent onboarding** - giving agents credentials they can use repeatedly for multiple transactions. But guest checkout needs **immediate payment authorization** - a one-time access token to complete this specific transaction.
+
+### Location in Code
+
+`agent-oauth.ts:1556-1567` - the `case 'approved':` branch returns credentials, not a token.
+
+### Agreed Solution: Option A - `response_type` parameter (2026-01-26)
+
+**Decision:** WSIM will add a `response_type` parameter to the device_authorization endpoint.
+
+| `response_type` | Behavior | Use Case |
+|-----------------|----------|----------|
+| `credentials` (default) | Returns `client_id` + `client_secret` | Agent onboarding (persistent) |
+| `token` | Returns `access_token` directly | Guest checkout (one-time) |
+
+**Gateway Request:**
+```json
+POST /api/agent/v1/oauth/device_authorization
+{
+  "agent_name": "SACP Gateway Checkout",
+  "scope": "purchase",
+  "spending_limits": { "per_transaction": "21.46", ... },
+  "response_type": "token"  // NEW
+}
+```
+
+**Token Response (after user approval):**
+```json
+{
+  "access_token": "eyJ...",
+  "token_type": "Bearer",
+  "expires_in": 300,
+  "scope": "purchase"
+}
+```
+
+**Why This Approach:**
+- ✅ RFC 8628 compliant for guest checkout
+- ✅ Backwards compatible (defaults to `credentials`)
+- ✅ Explicit intent - no magic heuristics
+- ✅ Minimal Gateway change (add one parameter)
+- ✅ One-shot tokens can't be reused (better security)
+
+**Implementation Status:**
+| Team | Task | Status |
+|------|------|--------|
+| WSIM | Add `responseType` field to AccessRequest schema | ✅ DONE (v1.2.4) |
+| WSIM | Accept `response_type` param in device_authorization | ✅ DONE (v1.2.4) |
+| WSIM | Return access_token when `responseType === 'token'` | ✅ DONE (v1.2.4) |
+| Gateway | Add `response_type: 'token'` to device_authorization call | ✅ DONE |
 
 ---
 
@@ -486,7 +579,7 @@ GATEWAY_CLIENT_SECRET=<provided-via-secure-channel>
 
 | Task | Effort | Status |
 |------|--------|--------|
-| **CHANGE REQUIRED**: Make guest checkout session endpoints unauthenticated | Medium | 🔴 TODO |
+| **CHANGE REQUIRED**: Make guest checkout session endpoints unauthenticated | Medium | ✅ DONE (v2.2.5) |
 | **Review**: Option A (unauthenticated sessions) confirmed | Review | ✅ CONFIRMED |
 | **Verify**: Ensure `agentContext` passed to NSIM in payment calls | Code Review | ✅ VERIFIED |
 
@@ -785,7 +878,7 @@ Body: { reason?: "User declined" }
 | 2 | WSIM Team | Register `sacp-gateway` in `KNOWN_OAUTH_CLIENTS` | Config | ✅ Done |
 | 3 | WSIM Team | Set `OAUTH_CLIENT_SECRET_SACP_GATEWAY` env var | Config | ✅ Done (dev) |
 | 6 | SSIM Team | Verify `agentContext` passed to NSIM | Code Review | ✅ Done (already implemented) |
-| 7 | mwsim Team | Ensure "Enter Code" screen accessible | Code/Config | ✅ Done |
+| 7 | mwsim Team | Ensure "Enter Code" screen accessible | Code/Config | ✅ Done (screen exists) |
 | 9 | WSIM Team | Shorten user codes to `WSIM-XXXXXX` | Enhancement | ✅ Done |
 
 **✅ PHASE 1 COMPLETE (2026-01-25):**
@@ -795,12 +888,12 @@ Body: { reason?: "User declined" }
 | 4 | Agents Team | Add `sacp-gateway` client_id/secret to Gateway config | Config | ✅ Done |
 | 5 | Agents Team | Implement guest checkout (Phase 1 tasks) | Code | ✅ Done |
 
-**🔴 BLOCKING - Architecture Fix Required:**
+**✅ UNBLOCKED - Architecture Fix Complete (2026-01-25):**
 
 | # | Owner | Task | Type | Status |
 |---|-------|------|------|--------|
-| 10 | SSIM Team | **Make guest checkout session endpoints unauthenticated** (`security: []`) | Code | 🔴 TODO |
-| 11 | Agents Team | Remove `getGatewayServiceToken()` workaround from Gateway | Code | ⏳ Blocked by #10 |
+| 10 | SSIM Team | **Make guest checkout session endpoints unauthenticated** (`security: []`) | Code | ✅ DONE (v2.2.5) |
+| 11 | Agents Team | Remove `getGatewayServiceToken()` workaround from Gateway | Code | ⬜ TODO (unblocked) |
 
 **🟡 Remaining Work (Non-Blocking):**
 
@@ -822,7 +915,7 @@ Body: { reason?: "User declined" }
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
-| **SSIM change delayed** | Medium | High | 🔴 **CURRENT BLOCKER**: Waiting for SSIM to make session endpoints unauthenticated (Option A) |
+| ~~SSIM change delayed~~ | ~~Medium~~ | ~~High~~ | ✅ **RESOLVED**: SSIM v2.2.5 deployed with unauthenticated guest checkout endpoints |
 | ~~SSIM requires per-user auth for checkout~~ | ~~Medium~~ | ~~High~~ | ✅ **Resolved**: Option A confirmed - SSIM will make guest checkout endpoints unauthenticated |
 | ~~agentContext not passed through SSIM → NSIM~~ | ~~Low~~ | ~~Medium~~ | ✅ **Resolved**: Already implemented in SSIM payment service |
 | Device auth flow has unexpected limitations | Low | Medium | Early testing with WSIM team |
@@ -874,12 +967,15 @@ Body: { reason?: "User declined" }
 
 | # | Task | Owner | Depends On | Status |
 |---|------|-------|------------|--------|
-| 2.0 | **SSIM: Make guest checkout session endpoints unauthenticated** | SSIM Team | - | 🔴 TODO |
+| 2.0 | **SSIM: Make guest checkout session endpoints unauthenticated** | SSIM Team | - | ✅ DONE (v2.2.5) |
 | 2.1 | SSIM: Verify `agentContext` passed to NSIM in payments | SSIM Team | - | ✅ DONE |
 | 2.2 | mwsim: Ensure "Enter Code" screen accessible in app | mwsim Team | - | ✅ DONE |
-| 2.3 | Gateway: Remove `getGatewayServiceToken()` workaround | Agents Team | 2.0 | ⏳ Blocked |
+| 2.2b | **WSIM: Fix device code verification endpoint (404)** | WSIM Team | - | ✅ DONE (v1.2.2/v1.2.3) |
+| 2.2c | **WSIM: Add response_type=token support** | WSIM Team | - | ✅ DONE (v1.2.4) |
+| 2.2d | **Gateway: Add response_type: 'token' to device auth call** | Agents Team | 2.2c | ✅ DONE (v1.4.1) |
+| 2.3 | Gateway: Remove `getGatewayServiceToken()` workaround | Agents Team | 2.0 | ⬜ TODO (unblocked) |
 
-**Note:** Phase 3 and 4 are blocked until SSIM completes task 2.0.
+**Note:** Phase 3 and 4 are now **unblocked** - SSIM completed task 2.0 in v2.2.5.
 
 ### Phase 3: Integration Testing (2026-01-29)
 
@@ -916,15 +1012,20 @@ Body: { reason?: "User declined" }
 - **Nice-to-have**: ✅ Shorter user codes implemented
 
 ### SSIM Team (Store)
-- **Phase 2**: 🔴 **BLOCKING** - Make guest checkout session endpoints unauthenticated (`security: []`)
+- **Phase 2**: ✅ **COMPLETE** - Guest checkout session endpoints now unauthenticated (v2.2.5)
 - **Rationale**: The original design spec was correct. Guest checkout = unauthenticated checkout.
 - ✅ agentContext flow to NSIM already verified
 
 ### mwsim Team (Mobile App)
-- **Phase 2**: Ensure "Enter Code" screen accessible ✅ COMPLETE
-- **Phase 3**: Test manual code entry flow (pending Gateway deployment)
+- **Phase 2**: Ensure "Enter Code" screen accessible ✅ DONE
+- **Phase 3**: Test manual code entry flow (blocked by WSIM 404)
 - ✅ Already approved design
-- ✅ Implementation complete (DeviceCodeEntryScreen)
+- ✅ DeviceCodeEntryScreen implemented and accessible
+
+### WSIM Team (Complete + Enhancement)
+- ✅ Device code verification endpoint fixed (v1.2.2/v1.2.3)
+- ✅ Token response mismatch fixed - `response_type=token` support (v1.2.4)
+- **Enhancement**: Push notification flow - WSIM has buyer email, could push directly instead of requiring code entry
 
 ### NSIM Team (Network) / BSIM Team (Bank)
 - **Phase 0**: Review and confirm no changes needed

@@ -1346,6 +1346,7 @@ app.post('/checkout/:session_id/complete', async (req, res) => {
           agent_name: 'SACP Gateway Guest Checkout',
           agent_description: `Payment authorization for checkout ${session_id}`,
           scope: 'browse cart purchase',
+          response_type: 'token', // Request access token directly (not credentials)
           spending_limits: {
             per_transaction: checkout.cart.total,
             currency: checkout.cart.currency,
