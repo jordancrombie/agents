@@ -5,6 +5,20 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.5] - 2026-01-26
+
+### Added
+- **QR Code Generation**: Gateway now generates QR codes server-side for payment authorization
+  - New `qr_code_data_url` field in authorization response contains ready-to-display QR code
+  - AI agents can embed directly with markdown: `![QR](qr_code_data_url)`
+  - Uses `qrcode` npm package for reliable, scannable QR codes
+  - Eliminates dependency on AI image generation (DALL-E can't make functional QR codes)
+
+### Changed
+- Authorization response now includes `qr_code_data_url` alongside existing fields
+- Updated message for non-push authorization to mention QR scanning option
+- OpenAPI spec updated with `qr_code_data_url` field documentation
+
 ## [1.4.4] - 2026-01-26
 
 ### Added

@@ -13,6 +13,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { createRequire } from 'module';
+import QRCode from 'qrcode';
 import { SsimClient, CartItem } from './clients/ssim.js';
 import { WsimClient } from './clients/wsim.js';
 
@@ -612,7 +613,7 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
         post: {
           operationId: 'completeCheckout',
           summary: 'Complete the purchase',
-          description: 'Finalize checkout. Returns 202 with authorization_required. Check notification_sent: if true, tell user to check phone; if false, offer QR code (from authorization_url) or manual code entry. Poll poll_endpoint every 5s until approved.',
+          description: 'Finalize checkout. Returns 202 with authorization_required. If notification_sent=true, tell user to check phone. If false, display qr_code_data_url as image or show user_code. Poll poll_endpoint every 5s.',
           security: [],
           parameters: [
             {
@@ -855,15 +856,16 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
         },
         AuthorizationRequired: {
           type: 'object',
-          description: 'User must authorize payment. Check notification_sent: true=user got push notification, false=offer QR or manual code.',
+          description: 'User must authorize payment. Check notification_sent: true=tell user to check phone, false=show QR code or manual code.',
           properties: {
             status: { type: 'string', enum: ['authorization_required'] },
-            authorization_url: { type: 'string', description: 'URL with code pre-filled - use to generate QR code' },
+            authorization_url: { type: 'string', description: 'URL with code pre-filled' },
+            qr_code_data_url: { type: 'string', description: 'QR code as data URL - display with ![QR](url) markdown' },
             user_code: { type: 'string', description: 'Code user enters manually (e.g., WSIM-A3J2K9)' },
             verification_uri: { type: 'string', description: 'URL where user enters the code manually' },
             poll_endpoint: { type: 'string', description: 'Poll this every 5s until approved/denied/expired' },
             expires_in: { type: 'integer', description: 'Seconds until code expires (typically 900)' },
-            notification_sent: { type: 'boolean', description: 'true=push sent (check phone), false=offer QR or manual code' },
+            notification_sent: { type: 'boolean', description: 'true=push sent (check phone), false=show QR or manual code' },
             message: { type: 'string', description: 'Human-readable message for user' },
           },
         },
@@ -1405,11 +1407,26 @@ app.post('/checkout/:session_id/complete', async (req, res) => {
     // Format amount for display (cents to dollars)
     const displayAmount = `${checkout.cart.currency} ${(checkout.cart.total / 100).toFixed(2)}`;
 
+    // Generate QR code data URL for the authorization URL
+    const authorizationUrl = deviceAuth.verification_uri_complete || deviceAuth.verification_uri;
+    let qrCodeDataUrl: string | undefined;
+    try {
+      qrCodeDataUrl = await QRCode.toDataURL(authorizationUrl, {
+        width: 200,
+        margin: 2,
+        color: { dark: '#000000', light: '#ffffff' },
+      });
+    } catch (qrError) {
+      console.error('Failed to generate QR code:', qrError);
+      // Continue without QR code - user can still enter code manually
+    }
+
     // Return 202 with authorization required response
     // Message varies based on whether push notification was sent
     return res.status(202).json({
       status: 'authorization_required',
-      authorization_url: deviceAuth.verification_uri_complete || deviceAuth.verification_uri,
+      authorization_url: authorizationUrl,
+      qr_code_data_url: qrCodeDataUrl,
       user_code: deviceAuth.user_code,
       verification_uri: deviceAuth.verification_uri,
       poll_endpoint: `/checkout/${session_id}/payment-status/${requestId}`,
@@ -1417,7 +1434,7 @@ app.post('/checkout/:session_id/complete', async (req, res) => {
       notification_sent: notificationSent,
       message: notificationSent
         ? `We've sent a payment request to your phone. Check your WSIM app to approve the ${displayAmount} payment. If you don't see it, enter code ${deviceAuth.user_code} at ${deviceAuth.verification_uri}.`
-        : `To complete your purchase of ${displayAmount}, please enter code ${deviceAuth.user_code} at ${deviceAuth.verification_uri} or open the link in your wallet app.`,
+        : `To complete your purchase of ${displayAmount}, please enter code ${deviceAuth.user_code} at ${deviceAuth.verification_uri} or scan the QR code with your wallet app.`,
     });
   } catch (error) {
     console.error('Complete checkout error:', error);
