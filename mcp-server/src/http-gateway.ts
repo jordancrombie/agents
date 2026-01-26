@@ -87,6 +87,7 @@ interface PendingDeviceAuth {
   interval: number; // polling interval in seconds
   amount: number;
   currency: string;
+  qrCodeBuffer?: Buffer; // QR code image for serving via URL
 }
 const pendingDeviceAuths = new Map<string, PendingDeviceAuth>();
 
@@ -287,7 +288,7 @@ async function getClients(session: Session): Promise<{ wsim: WsimClient; ssim: S
 app.get('/tools', (req, res) => {
   res.json({
     name: 'SACP Agent Gateway',
-    version: '1.4.5',
+    version: '1.4.6',
     description: 'HTTP gateway for AI agents to browse and purchase from SimToolBox stores',
     base_url: `${req.protocol}://${req.get('host')}`,
     authentication: {
@@ -340,7 +341,7 @@ app.get('/openapi.json', (req, res) => {
 **Two Authentication Options:**
 
 Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the OAuth flow automatically when configured as a connector.`,
-      version: '1.4.5',
+      version: '1.4.6',
       contact: {
         name: 'SimToolBox',
         url: 'https://simtoolbox.com',
@@ -613,7 +614,7 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
         post: {
           operationId: 'completeCheckout',
           summary: 'Complete the purchase',
-          description: 'Finalize checkout. Returns 202 with authorization_required. If notification_sent=true, tell user to check phone. If false, display qr_code_data_url as image or show user_code. Poll poll_endpoint every 5s.',
+          description: 'Finalize checkout. Returns 202 with authorization_required. If notification_sent=true, tell user to check phone. If false, display qr_code_url as image using ![QR](url) or show user_code. Poll poll_endpoint every 5s.',
           security: [],
           parameters: [
             {
@@ -723,6 +724,39 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
             },
             '404': {
               description: 'Session or request not found',
+            },
+          },
+        },
+      },
+      '/qr/{request_id}': {
+        get: {
+          operationId: 'getQRCode',
+          summary: 'Get QR code image for payment authorization',
+          description: 'Returns the QR code as a PNG image. Use this URL in markdown to display the QR code: ![Scan to pay](url). The QR code expires when the payment request expires.',
+          security: [],
+          parameters: [
+            {
+              name: 'request_id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+              description: 'Payment request ID from the qr_code_url field',
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'QR code PNG image',
+              content: {
+                'image/png': {
+                  schema: { type: 'string', format: 'binary' },
+                },
+              },
+            },
+            '404': {
+              description: 'QR code not found',
+            },
+            '410': {
+              description: 'QR code has expired',
             },
           },
         },
@@ -860,7 +894,7 @@ Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the O
           properties: {
             status: { type: 'string', enum: ['authorization_required'] },
             authorization_url: { type: 'string', description: 'URL with code pre-filled' },
-            qr_code_data_url: { type: 'string', description: 'QR code as data URL - display with ![QR](url) markdown' },
+            qr_code_url: { type: 'string', description: 'URL to QR code image - display with ![Scan to pay](url) markdown. ChatGPT can render this.' },
             user_code: { type: 'string', description: 'Code user enters manually (e.g., WSIM-A3J2K9)' },
             verification_uri: { type: 'string', description: 'URL where user enters the code manually' },
             poll_endpoint: { type: 'string', description: 'Poll this every 5s until approved/denied/expired' },
@@ -1407,26 +1441,33 @@ app.post('/checkout/:session_id/complete', async (req, res) => {
     // Format amount for display (cents to dollars)
     const displayAmount = `${checkout.cart.currency} ${(checkout.cart.total / 100).toFixed(2)}`;
 
-    // Generate QR code data URL for the authorization URL
+    // Generate QR code for the authorization URL
     const authorizationUrl = deviceAuth.verification_uri_complete || deviceAuth.verification_uri;
-    let qrCodeDataUrl: string | undefined;
+    let qrCodeBuffer: Buffer | undefined;
     try {
-      qrCodeDataUrl = await QRCode.toDataURL(authorizationUrl, {
+      qrCodeBuffer = await QRCode.toBuffer(authorizationUrl, {
         width: 200,
         margin: 2,
         color: { dark: '#000000', light: '#ffffff' },
       });
+      // Store QR code buffer for serving via URL endpoint
+      pendingAuth.qrCodeBuffer = qrCodeBuffer;
+      pendingDeviceAuths.set(requestId, pendingAuth);
     } catch (qrError) {
       console.error('Failed to generate QR code:', qrError);
       // Continue without QR code - user can still enter code manually
     }
+
+    // Build the base URL for serving QR code
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const qrCodeUrl = qrCodeBuffer ? `${baseUrl}/qr/${requestId}` : undefined;
 
     // Return 202 with authorization required response
     // Message varies based on whether push notification was sent
     return res.status(202).json({
       status: 'authorization_required',
       authorization_url: authorizationUrl,
-      qr_code_data_url: qrCodeDataUrl,
+      qr_code_url: qrCodeUrl, // URL to fetch QR code image (ChatGPT can render this)
       user_code: deviceAuth.user_code,
       verification_uri: deviceAuth.verification_uri,
       poll_endpoint: `/checkout/${session_id}/payment-status/${requestId}`,
@@ -1443,6 +1484,41 @@ app.post('/checkout/:session_id/complete', async (req, res) => {
       error_description: error instanceof Error ? error.message : 'Unknown error',
     });
   }
+});
+
+// Serve QR code image for payment authorization
+// This endpoint allows ChatGPT and other AIs to display the QR code using standard markdown
+app.get('/qr/:request_id', (req, res) => {
+  const { request_id } = req.params;
+
+  const pendingAuth = pendingDeviceAuths.get(request_id);
+  if (!pendingAuth) {
+    return res.status(404).json({
+      error: 'not_found',
+      error_description: 'QR code not found or expired',
+    });
+  }
+
+  if (!pendingAuth.qrCodeBuffer) {
+    return res.status(404).json({
+      error: 'not_found',
+      error_description: 'QR code not available',
+    });
+  }
+
+  // Check if expired
+  if (new Date() > pendingAuth.expiresAt) {
+    pendingDeviceAuths.delete(request_id);
+    return res.status(410).json({
+      error: 'expired',
+      error_description: 'QR code has expired',
+    });
+  }
+
+  // Serve the QR code as a PNG image
+  res.set('Content-Type', 'image/png');
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.send(pendingAuth.qrCodeBuffer);
 });
 
 // Poll step-up status

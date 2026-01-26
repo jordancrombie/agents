@@ -5,6 +5,19 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.6] - 2026-01-26
+
+### Fixed
+- **QR Code Display for ChatGPT**: Custom GPTs cannot render base64 data URLs as images
+  - Changed from `qr_code_data_url` (data URL) to `qr_code_url` (HTTP URL)
+  - New `GET /qr/:request_id` endpoint serves QR code as actual PNG image
+  - ChatGPT can now display QR codes using markdown: `![Scan to pay](qr_code_url)`
+  - QR codes expire automatically with the payment request
+
+### Changed
+- Authorization response field renamed from `qr_code_data_url` to `qr_code_url`
+- OpenAPI spec updated with new `/qr/{request_id}` endpoint documentation
+
 ## [1.4.5] - 2026-01-26
 
 ### Added

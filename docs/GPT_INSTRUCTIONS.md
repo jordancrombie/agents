@@ -2,7 +2,7 @@
 
 **Purpose**: Copy-paste these instructions into the "Instructions" field when creating a Custom GPT for SACP shopping.
 **Date**: 2026-01-26
-**Version**: 1.4.5
+**Version**: 1.4.6
 
 ---
 
@@ -36,7 +36,7 @@ Say: "I've sent a payment request to your phone! Please check your WSIM wallet a
 
 ### If notification_sent = false
 Display the QR code and offer manual entry as backup:
-1. Show the QR code using: `![Scan to pay](qr_code_data_url)` - this is a ready-to-scan QR code image
+1. Show the QR code using: `![Scan to pay](qr_code_url)` - this is a ready-to-scan QR code image
 2. Also provide manual option: "Or enter code **[user_code]** at [verification_uri]"
 
 ### After Authorization
@@ -50,7 +50,7 @@ Poll the `poll_endpoint` every 5 seconds. When status becomes "approved", show t
   "status": "authorization_required",
   "notification_sent": false,
   "authorization_url": "https://wsim.banksim.ca/device?code=WSIM-A3J2K9",
-  "qr_code_data_url": "data:image/png;base64,iVBORw0KGgo...",
+  "qr_code_url": "https://sacp.banksim.ca/qr/pay_abc123xyz789",
   "user_code": "WSIM-A3J2K9",
   "verification_uri": "https://wsim.banksim.ca/device",
   "poll_endpoint": "/checkout/abc123/payment-status/xyz789",
@@ -61,7 +61,7 @@ Poll the `poll_endpoint` every 5 seconds. When status becomes "approved", show t
 ### Your Response When notification_sent = false
 "To complete your purchase, scan this QR code with your WSIM wallet app:
 
-![Scan to pay](data:image/png;base64,iVBORw0KGgo...)
+![Scan to pay](https://sacp.banksim.ca/qr/pay_abc123xyz789)
 
 Or if you prefer, enter code **WSIM-A3J2K9** manually in your wallet app.
 
@@ -120,7 +120,7 @@ For the GPT configuration, enable these capabilities:
 | Image Generation | NO | QR codes are provided as data URLs - no generation needed |
 | Code Interpreter | Optional | Not needed |
 
-**Note**: The Gateway now generates QR codes server-side and returns them as `qr_code_data_url`. The GPT just needs to display the image using markdown - no image generation capability required.
+**Note**: The Gateway now generates QR codes server-side and returns them as `qr_code_url`. The GPT just needs to display the image using markdown - no image generation capability required.
 
 ---
 
@@ -156,8 +156,8 @@ The spec includes all necessary endpoints:
 
 ### GPT doesn't show QR code
 Check that:
-1. GPT is using `qr_code_data_url` field from the response (not authorization_url)
-2. GPT displays it with markdown: `![Scan](qr_code_data_url)`
+1. GPT is using `qr_code_url` field from the response (not authorization_url)
+2. GPT displays it with markdown: `![Scan](qr_code_url)`
 3. GPT is correctly reading notification_sent field
 
 ### GPT shows wrong authorization method
