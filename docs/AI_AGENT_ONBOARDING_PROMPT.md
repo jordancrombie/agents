@@ -2,7 +2,7 @@
 
 **Purpose**: Enable external AI agents to discover, register, and transact with SACP services
 **Date**: 2026-01-26
-**Version**: 1.4.6
+**Version**: 1.4.7
 **Target AIs**: ChatGPT, Gemini, Claude, or any AI with HTTP request capabilities
 
 ---
@@ -73,9 +73,12 @@ You'll receive:
 
 Based on `notification_sent`:
 - **If TRUE**: Tell me "Check your phone - I sent a payment request to your wallet app"
-- **If FALSE**: Display the QR code and offer manual entry:
+  - ALWAYS offer fallbacks: show QR code AND provide clickable `authorization_url`
+- **If FALSE**: Display the QR code and offer clickable link:
   1. Show QR: `![Scan to pay](qr_code_url)` - this is a ready-to-scan image
-  2. "Or enter code WSIM-XXXXXX in your wallet app at [verification_uri]"
+  2. "Or [click here to authorize](authorization_url)" - this link has the code pre-filled
+
+**IMPORTANT**: Always use `authorization_url` for user-facing links (has code pre-filled). Never send users to `verification_uri` (base URL without code).
 
 ### Step 5: Poll for Payment Status
 GET https://sacp.banksim.ca/checkout/<checkout_session_id>/payment-status/<request_id>

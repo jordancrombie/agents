@@ -2,7 +2,7 @@
 
 **Purpose**: Test the SACP protocol with an external AI (ChatGPT, Gemini, Claude, etc.)
 **Date**: 2026-01-26
-**Version**: 1.4.6
+**Version**: 1.4.7
 **Gateway URL**: https://sacp.banksim.ca
 **Prerequisites**:
 - Access to mwsim app for authorization approval
@@ -102,9 +102,12 @@ Since this is a guest checkout (no session), you'll get:
 
 Based on `notification_sent`:
 - **If TRUE**: Tell me "Check your phone - I sent a payment request to your wallet app"
-- **If FALSE**: Display the QR code and offer manual entry:
+  - ALWAYS offer fallbacks: show QR code AND provide clickable `authorization_url`
+- **If FALSE**: Display the QR code and offer clickable link:
   1. Show the QR code: `![Scan to pay](qr_code_url)` - this is a ready-to-scan image
-  2. "Or enter code WSIM-XXXXXX in your wallet app at [verification_uri]"
+  2. "Or [click here to authorize](authorization_url)" - the link has the code pre-filled
+
+**IMPORTANT**: Always use `authorization_url` for user-facing links (has code pre-filled). Never send users to `verification_uri` (base URL without code).
 
 ### Step 5: Poll for Payment Status
 GET https://sacp.banksim.ca/checkout/<checkout_session_id>/payment-status/<request_id>
@@ -491,6 +494,7 @@ Begin now by discovering the store at https://ssim.banksim.ca/.well-known/ucp
 |--------|----------------|-------------|
 | Push Notification | `notification_sent: true` | Tap notification on phone |
 | QR Code | Always | Scan `qr_code_url` (server-generated, ready to display) |
+| Clickable Link | Always | Click `authorization_url` (code pre-filled) |
 | Manual Code | Always | Enter `WSIM-XXXXXX` at `verification_uri` |
 
 ### Gateway with Auth (Option B)

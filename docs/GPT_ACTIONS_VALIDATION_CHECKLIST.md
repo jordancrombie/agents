@@ -70,6 +70,14 @@ These are HARD limitations that will silently fail:
 - [ ] **snake_case** for all JSON fields (not camelCase)
 - [ ] **Clear field documentation** in OpenAPI spec
 
+### 6.1 Authorization URL Fields
+
+- [ ] **GPT Instructions use correct URL field** for user-facing links:
+  - `authorization_url` - Full URL with code pre-filled (USE THIS for links)
+  - `qr_code_url` - HTTP URL serving QR code PNG (USE THIS for images)
+  - `verification_uri` - Base URL without code (ONLY for manual entry reference)
+- [ ] **Never direct users to `verification_uri`** - they'd have to manually type the code
+
 ### 7. Testing Steps
 
 Before committing:
@@ -149,6 +157,7 @@ curl -s -I https://sacp.banksim.ca/qr/test_123 | grep -E "(HTTP|Content-Type)"
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-01-26 | Initial checklist after v1.4.6 QR code fix |
+| 1.1 | 2026-01-26 | Added URL field guidance for v1.4.7 |
 
 ---
 
