@@ -309,7 +309,7 @@ async function getClients(session: Session): Promise<{ wsim: WsimClient; ssim: S
 app.get('/tools', (req, res) => {
   res.json({
     name: 'SACP Agent Gateway',
-    version: '1.4.7',
+    version: '1.4.8',
     description: 'HTTP gateway for AI agents to browse and purchase from SimToolBox stores',
     base_url: `${req.protocol}://${req.get('host')}`,
     authentication: {
@@ -346,6 +346,89 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Privacy policy endpoint
+app.get('/privacy', (req, res) => {
+  res.type('text/html').send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SACP Gateway Privacy Policy</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; color: #333; }
+    h1 { color: #d32f2f; border-bottom: 2px solid #d32f2f; padding-bottom: 10px; }
+    h2 { color: #1976d2; margin-top: 30px; }
+    .warning { background: #fff3e0; border-left: 4px solid #ff9800; padding: 15px; margin: 20px 0; }
+    .danger { background: #ffebee; border-left: 4px solid #d32f2f; padding: 15px; margin: 20px 0; }
+    code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+    table { border-collapse: collapse; width: 100%; margin: 15px 0; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+    th { background: #f5f5f5; }
+    .summary { background: #e3f2fd; border-left: 4px solid #1976d2; padding: 15px; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <h1>SACP Gateway Privacy Policy</h1>
+  <p><strong>Last Updated:</strong> January 2026 | <strong>Version:</strong> 1.0</p>
+
+  <div class="danger">
+    <h3>Important: This is a Simulation</h3>
+    <p><strong>SACP (SimToolBox Agent Commerce Protocol) is an educational sandbox environment for demonstrating AI agent commerce capabilities. This is NOT a production financial service.</strong></p>
+  </div>
+
+  <h2>Please Treat This Like a Simulation</h2>
+  <p>This platform is designed for learning, experimenting with AI-driven commerce, demonstrating agent-to-agent payment flows, and educational purposes.</p>
+  <p>This platform is <strong>NOT</strong> designed for real financial transactions, storing sensitive personal information, or production use cases requiring robust security.</p>
+
+  <div class="warning">
+    <h3>Do NOT Use Real Personal Information</h3>
+    <p>We strongly advise against entering any real personal information. Please use:</p>
+    <ul>
+      <li><strong>Fake email addresses</strong> (e.g., <code>testuser123@fake.com</code>)</li>
+      <li><strong>Fictional names</strong> (e.g., "Test User", "Demo Buyer")</li>
+      <li><strong>Made-up addresses</strong> (e.g., "123 Test St, Toronto, ON")</li>
+    </ul>
+    <p><strong>Why?</strong> This platform does not implement the security measures that real banks, financial institutions, or payment networks use to protect sensitive data.</p>
+  </div>
+
+  <h2>What Data We Collect</h2>
+  <table>
+    <tr><th>Data Type</th><th>Purpose</th><th>Retention</th></tr>
+    <tr><td>Email address</td><td>Checkout sessions, push notifications</td><td>Session duration</td></tr>
+    <tr><td>Name</td><td>Simulated order fulfillment</td><td>Session duration</td></tr>
+    <tr><td>Shipping address</td><td>Simulated order fulfillment</td><td>Session duration</td></tr>
+    <tr><td>Cart/order data</td><td>Demonstrating checkout flow</td><td>Session duration</td></tr>
+  </table>
+  <p><em>Most data is stored in-memory and is lost when the server restarts.</em></p>
+
+  <h2>Data Security Limitations</h2>
+  <p><strong>This is an educational platform.</strong> We explicitly disclaim robust production-grade security:</p>
+  <ul>
+    <li>Data may be stored in-memory without encryption</li>
+    <li>No SOC 2, PCI-DSS, or similar compliance</li>
+    <li>No dedicated security team monitoring for breaches</li>
+    <li>If you enter real personal information against our advice, you do so at your own risk</li>
+  </ul>
+
+  <h2>Third-Party Services</h2>
+  <p>SACP Gateway interacts with other SimToolBox simulation services: WSIM (Wallet Simulator), SSIM (Store Simulator), and BSIM (Bank Simulator). All are educational sandbox services with similar security limitations.</p>
+
+  <h2>AI Agent Access</h2>
+  <p>This platform is specifically designed for AI agent access (ChatGPT, Claude, Gemini, etc.). OAuth device authorization codes are used to authorize AI agent actions. All transactions are simulated - no real money is involved.</p>
+
+  <h2>Contact</h2>
+  <p>For questions: <a href="https://github.com/jordancrombie/SimToolBox/issues">GitHub Issues</a></p>
+
+  <div class="summary">
+    <h3>Summary</h3>
+    <p><strong>This is a simulation. Please treat it like one.</strong></p>
+    <p>Use fake/test data only. Do not enter real personal information. No real money is ever transacted. You assume all risk for any real data you choose to enter.</p>
+    <p>Thank you for exploring AI-driven commerce with SimToolBox!</p>
+  </div>
+</body>
+</html>`);
+});
+
 // OpenAPI spec for ChatGPT Actions and other LLM integrations
 app.get('/openapi.json', (req, res) => {
   // Force HTTPS for production - ChatGPT requires server URL to match origin
@@ -362,7 +445,7 @@ app.get('/openapi.json', (req, res) => {
 **Two Authentication Options:**
 
 Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the OAuth flow automatically when configured as a connector.`,
-      version: '1.4.7',
+      version: '1.4.8',
       contact: {
         name: 'SimToolBox',
         url: 'https://simtoolbox.com',

@@ -5,6 +5,16 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.8] - 2026-01-27
+
+### Added
+- **Privacy Policy**: Public privacy policy accessible at `/privacy` endpoint
+  - Emphasizes this is an educational sandbox/simulation
+  - Warns users NOT to use real personal information (fake emails, etc.)
+  - Explains data collection is minimal and session-based
+  - HTML-formatted page for easy viewing in browsers
+  - Markdown version available at `mcp-server/PRIVACY_POLICY.md`
+
 ## [1.4.7] - 2026-01-26
 
 ### Added
