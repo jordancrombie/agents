@@ -18,12 +18,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Supports RFC 8628 Device Authorization Grant flow
   - Returns both text content and image content for maximum compatibility
 - **Design Document**: Added `docs/design/MCP_IMAGE_CONTENT_QR.md` documenting the approach
+- **ChatGPT Apps SDK Integration**: New HTTP-based MCP server for OpenAI Apps SDK
+  - `src/mcp-apps-server.ts`: HTTP transport MCP server with SSE connections
+  - `src/assets/authorization-widget.html`: Rich authorization widget with QR code display
+  - Uses OpenAI Apps SDK patterns: `_meta.openai/outputTemplate`, `structuredContent`
+  - Widget templates registered as resources with `text/html+skybridge` MIME type
+  - Enables ChatGPT Apps to render QR codes via sandboxed iframe widgets
+  - New scripts: `start:apps`, `dev:apps` for running the ChatGPT Apps server
+  - Endpoints: `GET /mcp` (SSE), `POST /mcp/messages`, `GET /health`
 
 ### Technical Details
 - QR codes generated server-side using `qrcode` npm package
 - Base64-encoded PNG returned in MCP ImageContent
 - Fallback hierarchy: Push notification → QR code image → Clickable link → Manual code
-- HTTP Gateway unchanged (ChatGPT still cannot render external images)
+- HTTP Gateway unchanged (ChatGPT Custom GPTs still use clickable links)
+- ChatGPT Apps use MCP + widget templates for rich UI (different from Custom GPTs)
+- Widget uses `window.openai.getToolOutput()` and `window.openai.callTool()` for communication
 
 ## [1.4.10] - 2026-01-28
 

@@ -219,9 +219,86 @@ The solution is to use the appropriate content type for each transport:
 
 ---
 
+---
+
+## ChatGPT Apps SDK Integration
+
+### Overview
+
+OpenAI's [Apps SDK](https://developers.openai.com/apps-sdk/build/mcp-server) provides a different integration path from Custom GPTs. ChatGPT Apps can use MCP servers with HTTP transport and render rich UI via **widget templates**.
+
+### Architecture
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  ChatGPT App    │────▶│  MCP Apps       │────▶│     WSIM        │
+│  (UI Client)    │     │  Server (HTTP)  │     │  (Auth Server)  │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+        │                       │
+        │                       │ Widget Template
+        │                       │ (text/html+skybridge)
+        │                       ▼
+        │               ┌─────────────────┐
+        └──────────────▶│ Authorization   │
+          (iframe)      │ Widget (HTML)   │
+                        └─────────────────┘
+```
+
+### Key Differences from Custom GPTs
+
+| Feature | Custom GPTs | ChatGPT Apps |
+|---------|-------------|--------------|
+| Protocol | HTTP/REST (OpenAPI) | MCP over HTTP (SSE) |
+| Image Rendering | Not supported | Via widget templates |
+| UI Complexity | Text/Markdown only | Rich HTML/CSS/JS |
+| Communication | Request/Response | Bidirectional (callTool) |
+
+### Implementation Files
+
+- `mcp-server/src/mcp-apps-server.ts` - HTTP transport MCP server
+- `mcp-server/src/assets/authorization-widget.html` - Widget template
+
+### Widget Template Pattern
+
+Tools return `_meta` with `openai/outputTemplate` pointing to a widget:
+
+```typescript
+return {
+  content: [{ type: 'text', text: textFallback }],
+  structuredContent: {
+    amount: 25.99,
+    merchant_name: 'Demo Store',
+    qr_code_base64: '...',
+    authorization_url: 'https://...',
+  },
+  _meta: {
+    'openai/outputTemplate': 'ui://widget/authorization.html',
+  },
+};
+```
+
+The widget accesses this data via `window.openai.getToolOutput()` and can call other tools via `window.openai.callTool()`.
+
+### Running the ChatGPT Apps Server
+
+```bash
+# Development
+npm run dev:apps
+
+# Production
+npm run start:apps
+```
+
+Server runs at `http://localhost:8000` with:
+- `GET /mcp` - SSE connection
+- `POST /mcp/messages` - MCP requests
+- `GET /health` - Health check
+
+---
+
 ## Related Documentation
 
 - [MCP Specification - Tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
-- [MCP Apps Blog Post](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/)
+- [OpenAI Apps SDK](https://developers.openai.com/apps-sdk/build/mcp-server)
 - [GPT Instructions v1.4.10](../GPT_INSTRUCTIONS.md)
 - [CHANGELOG](../../mcp-server/CHANGELOG.md)
