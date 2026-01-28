@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Authorization</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8f9fa;
+      color: #1a1a1a;
+      padding: 16px;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #2d6cdf 0%, #1a4fa0 100%);
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .header .amount {
+      font-size: 32px;
+      font-weight: 700;
+      margin: 8px 0;
+    }
+    .header .merchant {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+    .content {
+      padding: 20px;
+    }
+    .qr-container {
+      text-align: center;
+      padding: 16px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+    .qr-container img {
+      max-width: 180px;
+      height: auto;
+      border-radius: 4px;
+    }
+    .qr-label {
+      font-size: 12px;
+      color: #666;
+      margin-top: 8px;
+    }
+    .divider {
+      display: flex;
+      align-items: center;
+      margin: 16px 0;
+      color: #999;
+      font-size: 12px;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .divider span {
+      padding: 0 12px;
+    }
+    .auth-link {
+      display: block;
+      background: #2d6cdf;
+      color: white;
+      text-decoration: none;
+      text-align: center;
+      padding: 14px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 12px;
+      transition: background 0.2s;
+    }
+    .auth-link:hover {
+      background: #1a4fa0;
+    }
+    .code-section {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+    .code-label {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    .code-value {
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 24px;
+      font-weight: 700;
+      color: #1a1a1a;
+      letter-spacing: 2px;
+    }
+    .status-bar {
+      padding: 16px 20px;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ffc107;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .status-dot.approved {
+      background: #28a745;
+      animation: none;
+    }
+    .status-dot.denied {
+      background: #dc3545;
+      animation: none;
+    }
+    .status-dot.expired {
+      background: #6c757d;
+      animation: none;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .status-text {
+      font-size: 13px;
+      color: #666;
+    }
+    .status-text.approved {
+      color: #28a745;
+      font-weight: 600;
+    }
+    .status-text.denied {
+      color: #dc3545;
+    }
+    .notification-badge {
+      background: #28a745;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .notification-badge svg {
+      flex-shrink: 0;
+    }
+    .expires {
+      font-size: 11px;
+      color: #999;
+      text-align: center;
+      margin-top: 12px;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Payment Authorization</h1>
+      <div class="amount" id="amount">$0.00</div>
+      <div class="merchant" id="merchant">Merchant</div>
+    </div>
+
+    <div class="content">
+      <div id="notification-banner" class="notification-badge hidden">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zm.995-14.901a1 1 0 1 0-1.99 0A5.002 5.002 0 0 0 3 6c0 1.098-.5 6-2 7h14c-1.5-1-2-5.902-2-7 0-2.42-1.72-4.44-4.005-4.901z"/>
+        </svg>
+        <span>Push notification sent to your phone!</span>
+      </div>
+
+      <div class="qr-container">
+        <img id="qr-code" src="" alt="Scan to authorize payment" />
+        <div class="qr-label">Scan with WSIM wallet app</div>
+      </div>
+
+      <div class="divider"><span>or</span></div>
+
+      <a id="auth-link" class="auth-link" href="#" target="_blank">
+        Open Authorization Page
+      </a>
+
+      <div class="code-section">
+        <div class="code-label">Manual code entry</div>
+        <div class="code-value" id="user-code">WSIM-XXXXXX</div>
+      </div>
+
+      <div class="expires" id="expires">Expires in 15 minutes</div>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-dot" id="status-dot"></div>
+      <div class="status-text" id="status-text">Waiting for authorization...</div>
+    </div>
+  </div>
+
+  <script>
+    // OpenAI Apps SDK bridge
+    const openai = window.openai;
+
+    // Get tool output data
+    let toolOutput = {};
+    let pollInterval = null;
+
+    async function initialize() {
+      try {
+        // Get the structured content from the tool result
+        toolOutput = await openai.getToolOutput();
+
+        // Update UI with payment details
+        updateUI(toolOutput);
+
+        // Start polling for status
+        if (toolOutput.device_code) {
+          startPolling(toolOutput.device_code);
+        }
+      } catch (error) {
+        console.error('Failed to initialize widget:', error);
+      }
+    }
+
+    function updateUI(data) {
+      // Amount and merchant
+      if (data.amount && data.currency) {
+        document.getElementById('amount').textContent =
+          `${data.currency} ${parseFloat(data.amount).toFixed(2)}`;
+      }
+      if (data.merchant_name) {
+        document.getElementById('merchant').textContent = data.merchant_name;
+      }
+
+      // QR code (base64 image)
+      if (data.qr_code_base64) {
+        document.getElementById('qr-code').src =
+          `data:image/png;base64,${data.qr_code_base64}`;
+      }
+
+      // Authorization link
+      if (data.authorization_url) {
+        const link = document.getElementById('auth-link');
+        link.href = data.authorization_url;
+      }
+
+      // User code
+      if (data.user_code) {
+        document.getElementById('user-code').textContent = data.user_code;
+      }
+
+      // Notification banner
+      if (data.notification_sent) {
+        document.getElementById('notification-banner').classList.remove('hidden');
+      }
+
+      // Expiration
+      if (data.expires_in) {
+        const minutes = Math.floor(data.expires_in / 60);
+        document.getElementById('expires').textContent =
+          `Expires in ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+      }
+    }
+
+    function updateStatus(status, message) {
+      const dot = document.getElementById('status-dot');
+      const text = document.getElementById('status-text');
+
+      // Remove all status classes
+      dot.classList.remove('approved', 'denied', 'expired');
+      text.classList.remove('approved', 'denied');
+
+      switch (status) {
+        case 'pending':
+          text.textContent = message || 'Waiting for authorization...';
+          break;
+        case 'approved':
+          dot.classList.add('approved');
+          text.classList.add('approved');
+          text.textContent = message || 'Payment authorized!';
+          stopPolling();
+          break;
+        case 'denied':
+          dot.classList.add('denied');
+          text.classList.add('denied');
+          text.textContent = message || 'Authorization denied';
+          stopPolling();
+          break;
+        case 'expired':
+          dot.classList.add('expired');
+          text.textContent = message || 'Authorization expired';
+          stopPolling();
+          break;
+      }
+    }
+
+    async function checkStatus(deviceCode) {
+      try {
+        // Call the status tool via OpenAI bridge
+        const result = await openai.callTool('device_authorize_status', {
+          device_code: deviceCode
+        });
+
+        if (result && result.structuredContent) {
+          const data = result.structuredContent;
+          updateStatus(data.status, data.message);
+
+          // If approved, we can update the parent with the token
+          if (data.status === 'approved' && data.access_token) {
+            // Token is available for the AI to use
+            console.log('Authorization approved, token available');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check status:', error);
+      }
+    }
+
+    function startPolling(deviceCode) {
+      // Poll every 3 seconds
+      pollInterval = setInterval(() => {
+        checkStatus(deviceCode);
+      }, 3000);
+
+      // Also check immediately
+      checkStatus(deviceCode);
+    }
+
+    function stopPolling() {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initialize);
+    } else {
+      initialize();
+    }
+  </script>
+</body>
+</html>

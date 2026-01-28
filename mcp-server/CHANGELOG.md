@@ -5,6 +5,36 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0-beta.1] - 2026-01-28 (feature/mcp-ui-authorization branch)
+
+### Added
+- **MCP ImageContent for QR Codes**: MCP server now returns QR codes as ImageContent
+  - MCP-capable clients (Claude Desktop) can render QR codes natively in tool results
+  - Uses the MCP specification's ImageContent type: `{ type: 'image', data: base64, mimeType: 'image/png' }`
+  - Solves the UI transport capability mismatch - QR codes are now first-class UI elements
+- **Device Authorization Tools**: New tools for guest checkout via device authorization
+  - `device_authorize`: Initiates device authorization, returns QR code + authorization URL
+  - `device_authorize_status`: Polls for authorization approval status
+  - Supports RFC 8628 Device Authorization Grant flow
+  - Returns both text content and image content for maximum compatibility
+- **Design Document**: Added `docs/design/MCP_IMAGE_CONTENT_QR.md` documenting the approach
+- **ChatGPT Apps SDK Integration**: New HTTP-based MCP server for OpenAI Apps SDK
+  - `src/mcp-apps-server.ts`: HTTP transport MCP server with SSE connections
+  - `src/assets/authorization-widget.html`: Rich authorization widget with QR code display
+  - Uses OpenAI Apps SDK patterns: `_meta.openai/outputTemplate`, `structuredContent`
+  - Widget templates registered as resources with `text/html+skybridge` MIME type
+  - Enables ChatGPT Apps to render QR codes via sandboxed iframe widgets
+  - New scripts: `start:apps`, `dev:apps` for running the ChatGPT Apps server
+  - Endpoints: `GET /mcp` (SSE), `POST /mcp/messages`, `GET /health`
+
+### Technical Details
+- QR codes generated server-side using `qrcode` npm package
+- Base64-encoded PNG returned in MCP ImageContent
+- Fallback hierarchy: Push notification → QR code image → Clickable link → Manual code
+- HTTP Gateway unchanged (ChatGPT Custom GPTs still use clickable links)
+- ChatGPT Apps use MCP + widget templates for rich UI (different from Custom GPTs)
+- Widget uses `window.openai.getToolOutput()` and `window.openai.callTool()` for communication
+
 ## [1.4.10] - 2026-01-28
 
 ### Changed

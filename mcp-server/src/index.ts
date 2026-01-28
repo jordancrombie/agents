@@ -16,9 +16,25 @@ import {
   ListToolsRequestSchema,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
+import * as QRCode from 'qrcode';
 
 import { SsimClient, CartItem } from './clients/ssim.js';
 import { WsimClient } from './clients/wsim.js';
+
+/**
+ * Generate a QR code as a base64-encoded PNG
+ * Used for MCP ImageContent to render QR codes in capable clients (e.g., Claude Desktop)
+ * HTTP-only clients (ChatGPT) cannot render MCP ImageContent and should use authorization URLs instead
+ */
+async function generateQRCodeBase64(url: string): Promise<string> {
+  const buffer = await QRCode.toBuffer(url, {
+    type: 'png',
+    width: 200,
+    margin: 2,
+    errorCorrectionLevel: 'M',
+  });
+  return buffer.toString('base64');
+}
 
 // Configuration from environment
 const config = {
@@ -252,13 +268,59 @@ const tools: Tool[] = [
       required: ['order_id'],
     },
   },
+
+  // === Device Authorization (Guest Checkout) ===
+  {
+    name: 'device_authorize',
+    description: 'Initiate device authorization for payment. Returns a user code and QR code for the user to scan. Use device_authorize_status to poll for approval. This is useful for guest checkout scenarios where the agent does not have pre-configured credentials.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        amount: {
+          type: 'number',
+          description: 'Payment amount in dollars (e.g., 25.99)',
+        },
+        currency: {
+          type: 'string',
+          description: 'Currency code (default: CAD)',
+        },
+        merchant_name: {
+          type: 'string',
+          description: 'Name of the merchant for display in the approval prompt',
+        },
+        description: {
+          type: 'string',
+          description: 'Description of the purchase',
+        },
+        buyer_email: {
+          type: 'string',
+          description: 'Optional buyer email - if known, WSIM may send a push notification',
+        },
+      },
+      required: ['amount', 'merchant_name'],
+    },
+  },
+  {
+    name: 'device_authorize_status',
+    description: 'Check the status of a device authorization request. Returns pending, approved (with access_token), denied, or expired.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        device_code: {
+          type: 'string',
+          description: 'The device_code from device_authorize response',
+        },
+      },
+      required: ['device_code'],
+    },
+  },
 ];
 
 // Create the MCP server
 const server = new Server(
   {
     name: 'sacp-mcp',
-    version: '1.0.0',
+    version: '1.5.0', // Added MCP ImageContent support for QR codes
   },
   {
     capabilities: {
@@ -433,6 +495,183 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const result = await ssim.getOrder(args.order_id as string);
         return {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      // === Device Authorization (Guest Checkout) ===
+      case 'device_authorize': {
+        const amount = args.amount as number;
+        const currency = (args.currency as string) || 'CAD';
+        const merchantName = args.merchant_name as string;
+        const description = (args.description as string) || `Payment to ${merchantName}`;
+        const buyerEmail = args.buyer_email as string | undefined;
+
+        // Call WSIM device authorization endpoint
+        const deviceAuthResponse = await fetch(
+          `${config.wsim.baseUrl}/api/agent/v1/device_authorization`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              agent_name: merchantName,
+              agent_description: description,
+              scope: 'browse cart purchase',
+              response_type: 'token',
+              spending_limits: {
+                per_transaction: amount.toString(),
+                currency,
+              },
+              buyer_email: buyerEmail,
+            }),
+          }
+        );
+
+        if (!deviceAuthResponse.ok) {
+          const errorText = await deviceAuthResponse.text();
+          throw new Error(`Device authorization failed: ${deviceAuthResponse.status} ${errorText}`);
+        }
+
+        const deviceAuth = await deviceAuthResponse.json() as {
+          device_code: string;
+          user_code: string;
+          verification_uri: string;
+          verification_uri_complete?: string;
+          expires_in: number;
+          notification_sent?: boolean;
+        };
+
+        // Build the authorization URL (use complete URI if available)
+        const authorizationUrl = deviceAuth.verification_uri_complete ||
+          `${deviceAuth.verification_uri}?code=${deviceAuth.user_code}`;
+
+        // Generate QR code for the authorization URL
+        // This will render as an image in MCP-capable clients (Claude Desktop)
+        const qrCodeBase64 = await generateQRCodeBase64(authorizationUrl);
+
+        // Build response text
+        const notificationSent = deviceAuth.notification_sent === true;
+        let responseText = `Payment Authorization Required\n`;
+        responseText += `================================\n\n`;
+        responseText += `Amount: ${currency} ${amount.toFixed(2)}\n`;
+        responseText += `Merchant: ${merchantName}\n\n`;
+
+        if (notificationSent) {
+          responseText += `A push notification has been sent to the user's phone.\n\n`;
+        }
+
+        responseText += `Authorization Options:\n`;
+        responseText += `1. Scan the QR code below with your WSIM wallet app\n`;
+        responseText += `2. Click: ${authorizationUrl}\n`;
+        responseText += `3. Enter code: ${deviceAuth.user_code}\n\n`;
+        responseText += `Device Code (for polling): ${deviceAuth.device_code}\n`;
+        responseText += `Expires in: ${deviceAuth.expires_in} seconds\n\n`;
+        responseText += `Use device_authorize_status with the device_code to poll for approval.`;
+
+        // Return both text and image content
+        // MCP-capable clients (Claude Desktop) will render the QR code image
+        return {
+          content: [
+            {
+              type: 'text',
+              text: responseText,
+            },
+            {
+              type: 'image',
+              data: qrCodeBase64,
+              mimeType: 'image/png',
+            },
+          ],
+        };
+      }
+
+      case 'device_authorize_status': {
+        const deviceCode = args.device_code as string;
+
+        // Poll WSIM token endpoint
+        const tokenResponse = await fetch(
+          `${config.wsim.baseUrl}/api/agent/v1/token`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+              device_code: deviceCode,
+            }),
+          }
+        );
+
+        const tokenResult = await tokenResponse.json() as {
+          error?: string;
+          error_description?: string;
+          access_token?: string;
+          token_type?: string;
+          expires_in?: number;
+        };
+
+        if (tokenResult.error) {
+          // Handle RFC 8628 error responses
+          switch (tokenResult.error) {
+            case 'authorization_pending':
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({
+                    status: 'pending',
+                    message: 'Authorization pending - user has not yet approved or denied',
+                  }, null, 2),
+                }],
+              };
+            case 'slow_down':
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({
+                    status: 'pending',
+                    message: 'Slow down - polling too frequently, wait longer between requests',
+                  }, null, 2),
+                }],
+              };
+            case 'access_denied':
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({
+                    status: 'denied',
+                    message: 'User denied the authorization request',
+                  }, null, 2),
+                }],
+              };
+            case 'expired_token':
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({
+                    status: 'expired',
+                    message: 'Authorization request expired - start a new device_authorize flow',
+                  }, null, 2),
+                }],
+              };
+            default:
+              throw new Error(`Token error: ${tokenResult.error} - ${tokenResult.error_description}`);
+          }
+        }
+
+        // Success - return the access token
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              status: 'approved',
+              access_token: tokenResult.access_token,
+              token_type: tokenResult.token_type,
+              expires_in: tokenResult.expires_in,
+              message: 'Authorization approved! Use this access_token for payment.',
+            }, null, 2),
+          }],
         };
       }
 
