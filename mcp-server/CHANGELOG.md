@@ -5,6 +5,14 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.9] - 2026-01-27
+
+### Fixed
+- **QR Code HTTPS**: Fixed `qr_code_url` to use HTTPS instead of HTTP
+  - ChatGPT runs over HTTPS and blocks mixed content (HTTP images)
+  - Now uses `GATEWAY_BASE_URL` config (https://sacp.banksim.ca) instead of `req.protocol`
+  - QR codes should now render correctly in ChatGPT Custom GPTs
+
 ## [1.4.8] - 2026-01-27
 
 ### Added

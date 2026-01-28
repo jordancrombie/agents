@@ -309,7 +309,7 @@ async function getClients(session: Session): Promise<{ wsim: WsimClient; ssim: S
 app.get('/tools', (req, res) => {
   res.json({
     name: 'SACP Agent Gateway',
-    version: '1.4.8',
+    version: '1.4.9',
     description: 'HTTP gateway for AI agents to browse and purchase from SimToolBox stores',
     base_url: `${req.protocol}://${req.get('host')}`,
     authentication: {
@@ -445,7 +445,7 @@ app.get('/openapi.json', (req, res) => {
 **Two Authentication Options:**
 
 Use OAuth 2.0 Authorization Code flow to authenticate. ChatGPT will handle the OAuth flow automatically when configured as a connector.`,
-      version: '1.4.8',
+      version: '1.4.9',
       contact: {
         name: 'SimToolBox',
         url: 'https://simtoolbox.com',
@@ -1570,8 +1570,9 @@ app.post('/checkout/:session_id/complete', async (req, res) => {
     }
 
     // Build the base URL for serving QR code
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const qrCodeUrl = qrCodeBuffer ? `${baseUrl}/qr/${requestId}` : undefined;
+    // Use configured GATEWAY_BASE_URL (HTTPS) to avoid mixed content issues
+    // ChatGPT won't render HTTP images on its HTTPS page
+    const qrCodeUrl = qrCodeBuffer ? `${config.gateway.baseUrl}/qr/${requestId}` : undefined;
 
     // Return 202 with authorization required response
     // Message varies based on whether push notification was sent
