@@ -5,13 +5,21 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.10] - 2026-01-28
+
+### Changed
+- **GPT Instructions**: Updated to use clickable authorization links as primary method
+  - ChatGPT Custom GPTs cannot render external images (platform security restriction)
+  - QR codes will not display regardless of correct HTTPS URLs or markdown syntax
+  - Updated `docs/GPT_INSTRUCTIONS.md` to use `authorization_url` links instead
+  - QR code URL still provided for other AI clients that can render images (Claude, custom apps)
+
 ## [1.4.9] - 2026-01-27
 
 ### Fixed
 - **QR Code HTTPS**: Fixed `qr_code_url` to use HTTPS instead of HTTP
   - ChatGPT runs over HTTPS and blocks mixed content (HTTP images)
   - Now uses `GATEWAY_BASE_URL` config (https://sacp.banksim.ca) instead of `req.protocol`
-  - QR codes should now render correctly in ChatGPT Custom GPTs
 
 ## [1.4.8] - 2026-01-27
 
