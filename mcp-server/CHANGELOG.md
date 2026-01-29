@@ -5,6 +5,15 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-01-29
+
+### Fixed
+- **SSIM API Paths**: Fixed incorrect API paths causing 404 errors
+  - Products: `/api/products` → `/api/agent/v1/products`
+  - Checkout: `/api/checkout` → `/api/agent/v1/sessions`
+  - Orders: `/api/orders` → `/api/agent/v1/orders`
+  - Now matches SSIM OpenAPI spec v2.2.3
+
 ## [1.5.0] - 2026-01-29
 
 ### Added

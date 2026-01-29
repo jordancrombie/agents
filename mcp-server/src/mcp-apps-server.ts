@@ -417,7 +417,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.0',
+              version: '1.5.1',
             },
           },
         };
@@ -536,7 +536,7 @@ async function executeTool(
       params.set('limit', limit.toString());
 
       const response = await fetch(
-        `${SSIM_BASE_URL}/api/products?${params.toString()}`
+        `${SSIM_BASE_URL}/api/agent/v1/products?${params.toString()}`
       );
 
       if (!response.ok) {
@@ -558,7 +558,7 @@ async function executeTool(
       const productId = args.product_id as string;
 
       const response = await fetch(
-        `${SSIM_BASE_URL}/api/products/${productId}`
+        `${SSIM_BASE_URL}/api/agent/v1/products/${productId}`
       );
 
       if (!response.ok) {
@@ -580,7 +580,7 @@ async function executeTool(
     case 'create_checkout': {
       const items = args.items as Array<{ product_id: string; quantity: number }>;
 
-      const response = await fetch(`${SSIM_BASE_URL}/api/checkout`, {
+      const response = await fetch(`${SSIM_BASE_URL}/api/agent/v1/sessions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -608,7 +608,7 @@ async function executeTool(
       const sessionId = args.session_id as string;
 
       const response = await fetch(
-        `${SSIM_BASE_URL}/api/checkout/${sessionId}`
+        `${SSIM_BASE_URL}/api/agent/v1/sessions/${sessionId}`
       );
 
       if (!response.ok) {
@@ -638,7 +638,7 @@ async function executeTool(
       if (shippingAddress) updateData.shipping_address = shippingAddress;
 
       const response = await fetch(
-        `${SSIM_BASE_URL}/api/checkout/${sessionId}`,
+        `${SSIM_BASE_URL}/api/agent/v1/sessions/${sessionId}`,
         {
           method: 'PATCH',
           headers: {
@@ -669,7 +669,7 @@ async function executeTool(
 
       // First, get the checkout to know the total and buyer info
       const checkoutResponse = await fetch(
-        `${SSIM_BASE_URL}/api/checkout/${sessionId}`
+        `${SSIM_BASE_URL}/api/agent/v1/sessions/${sessionId}`
       );
 
       if (!checkoutResponse.ok) {
@@ -787,7 +787,7 @@ async function executeTool(
       const sessionId = args.session_id as string;
 
       const response = await fetch(
-        `${SSIM_BASE_URL}/api/checkout/${sessionId}`,
+        `${SSIM_BASE_URL}/api/agent/v1/sessions/${sessionId}`,
         {
           method: 'DELETE',
         }
@@ -811,7 +811,7 @@ async function executeTool(
       const orderId = args.order_id as string;
 
       const response = await fetch(
-        `${SSIM_BASE_URL}/api/orders/${orderId}`
+        `${SSIM_BASE_URL}/api/agent/v1/orders/${orderId}`
       );
 
       if (!response.ok) {
@@ -1119,7 +1119,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.0',
+      version: '1.5.1',
       timestamp: new Date().toISOString(),
     })
   );
