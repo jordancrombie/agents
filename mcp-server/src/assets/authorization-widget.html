@@ -286,78 +286,43 @@
   </div>
 
   <script>
-    // OpenAI Apps SDK bridge - v1.5.15
-    // Single source of truth: toolOutput only (no _meta fallback)
-    // Data guard: don't render until required fields exist
+    // OpenAI Apps SDK bridge - Event-driven approach (not polling)
     let pollInterval = null;
     let deviceCode = null;
     let initialized = false;
-    let dataRetryTimer = null;
 
-    // Get tool output data - reads ONLY from toolOutput (structuredContent)
-    // No fallback to toolResponseMetadata to avoid double-source bugs
+    // Get tool output data - reads directly from window.openai
     function getToolData() {
       if (!window.openai) return null;
 
-      const out = window.openai.toolOutput;
-      if (!out || typeof out !== 'object') return null;
+      // Primary: toolOutput contains structuredContent
+      const toolOutput = window.openai.toolOutput;
+      if (toolOutput && typeof toolOutput === 'object') {
+        console.log('[SACP] Found toolOutput:', toolOutput);
+        return toolOutput;
+      }
 
-      // Normalize: some hosts wrap in structuredContent, some don't
-      const data = (out.structuredContent && typeof out.structuredContent === 'object')
-        ? out.structuredContent
-        : out;
+      // Fallback: toolResponseMetadata contains _meta payload
+      const toolResponseMetadata = window.openai.toolResponseMetadata;
+      if (toolResponseMetadata && typeof toolResponseMetadata === 'object') {
+        console.log('[SACP] Found toolResponseMetadata:', toolResponseMetadata);
+        return toolResponseMetadata;
+      }
 
-      console.log('[SACP] toolOutput data:', data);
-      return data;
-    }
-
-    // Check if data has required fields to render the full UI
-    function isDataComplete(data) {
-      return data && data.qr_code_base64 && data.authorization_url;
+      return null;
     }
 
     // Handle data when available - called from event or initial check
     function handleData(data) {
       if (initialized) return; // Prevent double initialization
-
-      // Guard: Don't fully initialize until data is complete
-      if (!isDataComplete(data)) {
-        console.log('[SACP] Data incomplete, showing loading state and retrying...');
-        showLoadingState();
-
-        // Start retry polling if not already running
-        if (!dataRetryTimer) {
-          dataRetryTimer = setInterval(() => {
-            const nextData = getToolData();
-            if (isDataComplete(nextData)) {
-              clearInterval(dataRetryTimer);
-              dataRetryTimer = null;
-              handleData(nextData);
-            }
-          }, 250);
-        }
-        return;
-      }
-
-      // Data is complete, stop any retry timer
-      if (dataRetryTimer) {
-        clearInterval(dataRetryTimer);
-        dataRetryTimer = null;
-      }
-
       initialized = true;
-      console.log('[SACP] Data complete, initializing UI');
+
+      console.log('[SACP] Data received, initializing UI');
       updateUI(data);
       deviceCode = data.device_code;
       if (deviceCode) {
         startPolling(deviceCode);
       }
-    }
-
-    function showLoadingState() {
-      // Keep the default "Loading..." state visible
-      // The HTML defaults already show "Loading..." in the detail values
-      document.getElementById('status-text').textContent = 'Loading payment details...';
     }
 
     // Initialize using event-driven approach (recommended by OpenAI)
