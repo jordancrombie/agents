@@ -7,7 +7,7 @@
  *
  * Endpoints:
  * - GET /mcp - SSE connection for MCP transport
- * - POST /mcp/messages - Message endpoint for MCP requests
+ * - POST /mcp/message - Message endpoint for MCP requests
  * - GET /health - Health check
  *
  * This server enables ChatGPT Apps to render QR codes and authorization UI
@@ -503,6 +503,9 @@ function handleSseRequest(res: ServerResponse) {
   // Send session ID to client
   res.write(`event: session\ndata: ${JSON.stringify({ sessionId })}\n\n`);
 
+  // Send endpoint event telling client where to POST messages (MCP SSE transport requirement)
+  res.write(`event: endpoint\ndata: /mcp/message?sessionId=${sessionId}\n\n`);
+
   // Heartbeat to keep connection alive
   const heartbeat = setInterval(() => {
     res.write(': heartbeat\n\n');
@@ -623,7 +626,7 @@ const httpServer = createServer(async (req, res) => {
   }
 
   // Message endpoint
-  if (req.method === 'POST' && url.pathname === '/mcp/messages') {
+  if (req.method === 'POST' && url.pathname === '/mcp/message') {
     await handlePostMessage(req, res, url);
     return;
   }

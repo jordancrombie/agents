@@ -290,8 +290,8 @@ npm run start:apps
 ```
 
 Server runs at `http://localhost:8000` with:
-- `GET /mcp` - SSE connection
-- `POST /mcp/messages` - MCP requests
+- `GET /mcp` - SSE connection (emits `session` and `endpoint` events)
+- `POST /mcp/message?sessionId=...` - MCP JSON-RPC requests
 - `GET /health` - Health check
 
 ---

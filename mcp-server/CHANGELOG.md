@@ -25,7 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Widget templates registered as resources with `text/html+skybridge` MIME type
   - Enables ChatGPT Apps to render QR codes via sandboxed iframe widgets
   - New scripts: `start:apps`, `dev:apps` for running the ChatGPT Apps server
-  - Endpoints: `GET /mcp` (SSE), `POST /mcp/messages`, `GET /health`
+  - Endpoints: `GET /mcp` (SSE), `POST /mcp/message`, `GET /health`
+  - Emits `endpoint` event on SSE stream per MCP transport spec
 
 ### Technical Details
 - QR codes generated server-side using `qrcode` npm package
