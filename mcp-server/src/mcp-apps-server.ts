@@ -32,7 +32,7 @@ const SSIM_BASE_URL = process.env.SSIM_BASE_URL || 'https://ssim.banksim.ca';
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.12';
+const WIDGET_VERSION = '1.5.13';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -100,13 +100,8 @@ function getToolDefinitionMeta() {
   };
 }
 
-// Tool RESULT metadata - only outputTemplate needed here
-// widgetCSP and widgetDomain go in resource definitions, not results
-function getToolResultMeta() {
-  return {
-    'openai/outputTemplate': WIDGET_URI,
-  };
-}
+// NOTE: _meta in tool results should ONLY contain 'openai/outputTemplate'
+// Adding extra data to _meta breaks widget rendering
 
 const tools = [
   // === Store Discovery & Browsing ===
@@ -427,7 +422,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.12',
+              version: '1.5.13',
             },
           },
         };
@@ -819,16 +814,12 @@ async function executeTool(
             text: textContent,
           },
         ],
-        // structuredContent -> toolOutput (visible to model)
-        structuredContent: {
-          ...paymentData,
-          __ping: 'structuredContent-checkout', // Diagnostic sentinel
-        },
+        // structuredContent -> toolOutput (visible to model and widget)
+        structuredContent: paymentData,
+        // _meta ONLY contains outputTemplate - no other data!
+        // Extra fields in _meta may break widget rendering
         _meta: {
-          ...getToolResultMeta(),
-          // Duplicate payment data in _meta for toolResponseMetadata fallback
-          ...paymentData,
-          __metaPing: 'meta-checkout', // Diagnostic sentinel
+          'openai/outputTemplate': WIDGET_URI,
         },
       };
     }
@@ -972,16 +963,12 @@ async function executeTool(
             text: textContent,
           },
         ],
-        // structuredContent -> toolOutput (visible to model)
-        structuredContent: {
-          ...paymentData,
-          __ping: 'structuredContent-authorize', // Diagnostic sentinel
-        },
-        // Widget template reference + payment data for toolResponseMetadata fallback
+        // structuredContent -> toolOutput (visible to model and widget)
+        structuredContent: paymentData,
+        // _meta ONLY contains outputTemplate - no other data!
+        // Extra fields in _meta may break widget rendering
         _meta: {
-          ...getToolResultMeta(),
-          ...paymentData,
-          __metaPing: 'meta-authorize', // Diagnostic sentinel
+          'openai/outputTemplate': WIDGET_URI,
         },
       };
     }
@@ -1178,7 +1165,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.12',
+      version: '1.5.13',
       timestamp: new Date().toISOString(),
     })
   );
