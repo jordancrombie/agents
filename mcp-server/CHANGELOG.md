@@ -5,6 +5,14 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-01-29
+
+### Fixed
+- **WSIM API Paths**: Fixed incorrect OAuth paths for device authorization
+  - Device authorization: `/api/agent/v1/device_authorization` → `/api/agent/v1/oauth/device_authorization`
+  - Token endpoint: `/api/agent/v1/token` → `/api/agent/v1/oauth/token`
+  - Now matches WSIM OpenAPI spec v1.1.5
+
 ## [1.5.1] - 2026-01-29
 
 ### Fixed

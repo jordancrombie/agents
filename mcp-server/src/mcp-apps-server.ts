@@ -417,7 +417,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.1',
+              version: '1.5.2',
             },
           },
         };
@@ -696,7 +696,7 @@ async function executeTool(
 
       // Call WSIM device authorization endpoint
       const deviceAuthResponse = await fetch(
-        `${WSIM_BASE_URL}/api/agent/v1/device_authorization`,
+        `${WSIM_BASE_URL}/api/agent/v1/oauth/device_authorization`,
         {
           method: 'POST',
           headers: {
@@ -840,7 +840,7 @@ async function executeTool(
 
       // Call WSIM device authorization endpoint
       const deviceAuthResponse = await fetch(
-        `${WSIM_BASE_URL}/api/agent/v1/device_authorization`,
+        `${WSIM_BASE_URL}/api/agent/v1/oauth/device_authorization`,
         {
           method: 'POST',
           headers: {
@@ -931,7 +931,7 @@ async function executeTool(
       const deviceCode = args.device_code as string;
 
       // Poll WSIM token endpoint
-      const tokenResponse = await fetch(`${WSIM_BASE_URL}/api/agent/v1/token`, {
+      const tokenResponse = await fetch(`${WSIM_BASE_URL}/api/agent/v1/oauth/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -1119,7 +1119,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.1',
+      version: '1.5.2',
       timestamp: new Date().toISOString(),
     })
   );
