@@ -32,7 +32,7 @@ const SSIM_BASE_URL = process.env.SSIM_BASE_URL || 'https://ssim.banksim.ca';
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.10';
+const WIDGET_VERSION = '1.5.14';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -421,7 +421,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.10',
+              version: '1.5.14',
             },
           },
         };
@@ -813,17 +813,12 @@ async function executeTool(
             text: textContent,
           },
         ],
-        // structuredContent -> toolOutput (visible to model)
+        // structuredContent -> toolOutput (widget reads from here)
         structuredContent: {
           ...paymentData,
-          __ping: 'structuredContent-checkout', // Diagnostic sentinel
         },
-        _meta: {
-          'openai/outputTemplate': WIDGET_URI,
-          // Duplicate payment data in _meta for toolResponseMetadata fallback
-          ...paymentData,
-          __metaPing: 'meta-checkout', // Diagnostic sentinel
-        },
+        // outputTemplate is in tool definition only (not here) to avoid double widget mount
+        _meta: {},
       };
     }
 
@@ -966,17 +961,12 @@ async function executeTool(
             text: textContent,
           },
         ],
-        // structuredContent -> toolOutput (visible to model)
+        // structuredContent -> toolOutput (widget reads from here)
         structuredContent: {
           ...paymentData,
-          __ping: 'structuredContent-authorize', // Diagnostic sentinel
         },
-        // Widget template reference + payment data for toolResponseMetadata fallback
-        _meta: {
-          'openai/outputTemplate': WIDGET_URI,
-          ...paymentData,
-          __metaPing: 'meta-authorize', // Diagnostic sentinel
-        },
+        // outputTemplate is in tool definition only (not here) to avoid double widget mount
+        _meta: {},
       };
     }
 
@@ -1172,7 +1162,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.10',
+      version: '1.5.14',
       timestamp: new Date().toISOString(),
     })
   );
