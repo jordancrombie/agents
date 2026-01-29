@@ -33,6 +33,14 @@ const WSIM_BASE_URL = process.env.WSIM_BASE_URL || 'https://wsim.banksim.ca';
 const WIDGET_URI = 'ui://widget/authorization.html';
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
+// Widget Content Security Policy - required for OpenAI Apps SDK submission
+// Allows inline scripts/styles for the widget, data: URIs for base64 QR code images
+const WIDGET_CSP =
+  "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'";
+
+// Unique domain identifier for the widget - required for OpenAI Apps SDK submission
+const WIDGET_DOMAIN = 'sacp.banksim.ca';
+
 // Load widget template at startup
 let widgetTemplate: string;
 try {
@@ -151,14 +159,6 @@ const tools = [
 ];
 
 // Resource definitions (widget templates)
-// Widget Content Security Policy - required for OpenAI Apps SDK submission
-// Allows inline scripts/styles for the widget, data: URIs for base64 QR code images
-const WIDGET_CSP =
-  "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'";
-
-// Unique domain identifier for the widget - required for OpenAI Apps SDK submission
-const WIDGET_DOMAIN = 'sacp.banksim.ca';
-
 const resources = [
   {
     uri: WIDGET_URI,
