@@ -296,19 +296,58 @@
         // Try multiple ways to get the tool output
         let data = null;
 
-        if (openai && typeof openai.getToolOutput === 'function') {
+        // Debug: log what's available on window.openai
+        console.log('Widget init - openai object:', openai);
+        if (openai) {
+          console.log('openai keys:', Object.keys(openai));
+          console.log('openai.toolOutput:', openai.toolOutput);
+          console.log('openai.structuredContent:', openai.structuredContent);
+        }
+
+        // Method 1: Try toolOutput property (per SDK docs)
+        if (!data && openai && openai.toolOutput) {
+          console.log('Trying openai.toolOutput property');
+          data = openai.toolOutput;
+          // Check if it's wrapped in structuredContent
+          if (data && data.structuredContent) {
+            data = data.structuredContent;
+          }
+        }
+
+        // Method 2: Try structuredContent directly
+        if (!data && openai && openai.structuredContent) {
+          console.log('Trying openai.structuredContent');
+          data = openai.structuredContent;
+        }
+
+        // Method 3: Try getToolOutput() function
+        if (!data && openai && typeof openai.getToolOutput === 'function') {
+          console.log('Trying openai.getToolOutput()');
           try {
-            data = await openai.getToolOutput();
+            const result = await openai.getToolOutput();
+            console.log('getToolOutput result:', result);
+            data = result;
+            // Check if it's wrapped in structuredContent
+            if (data && data.structuredContent) {
+              data = data.structuredContent;
+            }
           } catch (e) {
             console.warn('getToolOutput failed:', e);
           }
         }
 
-        // Also check if data was passed via URL params (fallback)
+        // Method 4: Try toolResponseMetadata
+        if (!data && openai && openai.toolResponseMetadata) {
+          console.log('Trying openai.toolResponseMetadata');
+          data = openai.toolResponseMetadata;
+        }
+
+        // Fallback: URL params
         if (!data) {
           const params = new URLSearchParams(window.location.search);
           const encoded = params.get('data');
           if (encoded) {
+            console.log('Trying URL params fallback');
             try {
               data = JSON.parse(atob(encoded));
             } catch (e) {
@@ -317,10 +356,13 @@
           }
         }
 
-        // Check for window.TOOL_OUTPUT (another fallback)
+        // Fallback: window.TOOL_OUTPUT
         if (!data && window.TOOL_OUTPUT) {
+          console.log('Trying window.TOOL_OUTPUT fallback');
           data = window.TOOL_OUTPUT;
         }
+
+        console.log('Final data:', data);
 
         if (data) {
           updateUI(data);
@@ -329,7 +371,7 @@
             startPolling(deviceCode);
           }
         } else {
-          showError('Unable to load payment details. Please try again.');
+          showError('Unable to load payment details. Check browser console for debug info.');
         }
       } catch (error) {
         console.error('Widget init error:', error);

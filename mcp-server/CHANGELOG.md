@@ -5,6 +5,16 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.6] - 2026-01-29
+
+### Fixed
+- **Widget Data Loading Debug**: Added comprehensive logging to debug `getToolOutput()` issue
+  - Try `openai.toolOutput` property first (per SDK docs)
+  - Try `openai.structuredContent` as fallback
+  - Try `openai.getToolOutput()` function
+  - Check for wrapped `structuredContent` in responses
+  - Console logs to diagnose what data paths are available
+
 ## [1.5.5] - 2026-01-29
 
 ### Fixed
