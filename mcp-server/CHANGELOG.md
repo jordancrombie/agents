@@ -5,6 +5,21 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3] - 2026-01-29
+
+### Fixed
+- **SSIM Response Schema Mismatch**: Fixed complete_checkout and update_checkout to match actual SSIM session schema
+  - `checkout.total` → `checkout.cart.total` (total is nested inside cart object)
+  - `checkout.currency` → `checkout.cart.currency`
+  - `checkout.items` → `checkout.cart.items`
+  - `checkout.buyer_email` → `checkout.buyer.email` (buyer is nested object)
+  - Fixed "Cannot read properties of undefined (reading 'toString')" error
+- **Update Checkout Payload**: Fixed update_checkout to send nested objects per SSIM spec
+  - `buyer_name` → `buyer: { name }` (nested object)
+  - `buyer_email` → `buyer: { email }` (nested object)
+  - `shipping_address` → `fulfillment: { type, address }` (nested object)
+  - Now buyer/fulfillment actually persist on session updates
+
 ## [1.5.2] - 2026-01-29
 
 ### Fixed

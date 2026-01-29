@@ -417,7 +417,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.2',
+              version: '1.5.3',
             },
           },
         };
@@ -632,10 +632,26 @@ async function executeTool(
       const buyerEmail = args.buyer_email as string | undefined;
       const shippingAddress = args.shipping_address as string | undefined;
 
-      const updateData: Record<string, string> = {};
-      if (buyerName) updateData.buyer_name = buyerName;
-      if (buyerEmail) updateData.buyer_email = buyerEmail;
-      if (shippingAddress) updateData.shipping_address = shippingAddress;
+      // Build update data matching SSIM Session schema (nested objects)
+      const updateData: Record<string, unknown> = {};
+
+      // Buyer is a nested object: { name, email, phone }
+      if (buyerName || buyerEmail) {
+        updateData.buyer = {
+          ...(buyerName && { name: buyerName }),
+          ...(buyerEmail && { email: buyerEmail }),
+        };
+      }
+
+      // Fulfillment is a nested object: { type, address }
+      if (shippingAddress) {
+        updateData.fulfillment = {
+          type: 'shipping',
+          address: {
+            street: shippingAddress,
+          },
+        };
+      }
 
       const response = await fetch(
         `${SSIM_BASE_URL}/api/agent/v1/sessions/${sessionId}`,
@@ -676,23 +692,36 @@ async function executeTool(
         throw new Error(`Failed to fetch checkout: ${checkoutResponse.status}`);
       }
 
+      // SSIM Session schema: cart is nested object with items, total, currency
       const checkout = await checkoutResponse.json() as {
-        total: number;
-        currency?: string;
-        buyer_name?: string;
-        buyer_email?: string;
-        merchant_name?: string;
-        items?: Array<{ name: string; quantity: number }>;
+        session_id: string;
+        status: string;
+        cart?: {
+          items?: Array<{ product_id: string; name: string; quantity: number; unit_price: number; subtotal: number }>;
+          subtotal?: number;
+          tax?: number;
+          total?: number;
+          currency?: string;
+        };
+        buyer?: {
+          name?: string;
+          email?: string;
+        };
       };
 
-      // Build description from items
-      const itemNames = checkout.items?.map(i => `${i.quantity}x ${i.name}`).join(', ') || 'Purchase';
-      const merchantName = checkout.merchant_name || 'SACP Demo Store';
+      // Validate cart exists
+      if (!checkout.cart || checkout.cart.total === undefined) {
+        throw new Error('Checkout cart is empty or has no total. Add items first.');
+      }
+
+      // Build description from cart items
+      const itemNames = checkout.cart.items?.map(i => `${i.quantity}x ${i.name}`).join(', ') || 'Purchase';
+      const merchantName = 'SACP Demo Store';
 
       // Now initiate device authorization for the total
-      const amount = checkout.total;
-      const currency = checkout.currency || 'CAD';
-      const buyerEmail = checkout.buyer_email;
+      const amount = checkout.cart.total;
+      const currency = checkout.cart.currency || 'CAD';
+      const buyerEmail = checkout.buyer?.email;
 
       // Call WSIM device authorization endpoint
       const deviceAuthResponse = await fetch(
@@ -1119,7 +1148,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.2',
+      version: '1.5.3',
       timestamp: new Date().toISOString(),
     })
   );
