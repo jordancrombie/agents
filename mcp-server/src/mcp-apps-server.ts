@@ -32,7 +32,7 @@ const SSIM_BASE_URL = process.env.SSIM_BASE_URL || 'https://ssim.banksim.ca';
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.10';
+const WIDGET_VERSION = '1.5.16';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -91,17 +91,6 @@ interface SessionRecord {
 const sessions = new Map<string, SessionRecord>();
 
 // Tool definitions with OpenAI Apps SDK metadata
-function getToolMeta() {
-  return {
-    'openai/outputTemplate': WIDGET_URI,
-    'openai/widgetCSP': WIDGET_CSP,
-    'openai/widgetDomain': WIDGET_DOMAIN,
-    'openai/toolInvocation/invoking': 'Processing payment authorization...',
-    'openai/toolInvocation/invoked': 'Authorization widget ready',
-    'openai/widgetAccessible': true,
-  };
-}
-
 const tools = [
   // === Store Discovery & Browsing ===
   {
@@ -245,8 +234,11 @@ const tools = [
   },
   {
     name: 'complete_checkout',
-    description: 'Complete a checkout session. This will initiate device authorization for payment and return a QR code widget.',
-    _meta: getToolMeta(),
+    description: 'Complete a checkout session. This initiates device authorization for payment. After calling this, you MUST call show_payment_widget to display the QR code to the user.',
+    _meta: {
+      'openai/toolInvocation/invoking': 'Processing payment authorization...',
+      'openai/toolInvocation/invoked': 'Payment ready - display widget next',
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -311,8 +303,11 @@ const tools = [
   {
     name: 'device_authorize',
     description:
-      'Initiate device authorization for payment. Returns a QR code widget for the user to scan and authorize the payment.',
-    _meta: getToolMeta(),
+      'Initiate device authorization for payment. After calling this, you MUST call show_payment_widget to display the QR code to the user.',
+    _meta: {
+      'openai/toolInvocation/invoking': 'Processing payment authorization...',
+      'openai/toolInvocation/invoked': 'Payment ready - display widget next',
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -370,6 +365,48 @@ const tools = [
       readOnlyHint: true,
     },
   },
+
+  // === Widget Rendering (Two-Tool Handoff) ===
+  {
+    name: 'show_payment_widget',
+    description:
+      'Display the payment authorization widget with QR code. Call this immediately after device_authorize or complete_checkout with the payment_data from their response.',
+    _meta: {
+      'openai/outputTemplate': WIDGET_URI,
+      'openai/widgetCSP': WIDGET_CSP,
+      'openai/widgetDomain': WIDGET_DOMAIN,
+      'openai/toolInvocation/invoking': 'Rendering payment widget...',
+      'openai/toolInvocation/invoked': 'Payment widget displayed',
+      'openai/widgetAccessible': true,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        payment_data: {
+          type: 'object',
+          description: 'The payment_data object from device_authorize or complete_checkout response',
+          properties: {
+            amount: { type: 'number' },
+            currency: { type: 'string' },
+            merchant_name: { type: 'string' },
+            description: { type: 'string' },
+            authorization_url: { type: 'string' },
+            user_code: { type: 'string' },
+            device_code: { type: 'string' },
+            qr_code_base64: { type: 'string' },
+            notification_sent: { type: 'boolean' },
+            expires_in: { type: 'number' },
+            checkout_session_id: { type: 'string' },
+          },
+        },
+      },
+      required: ['payment_data'],
+    },
+    annotations: {
+      destructiveHint: false,
+      readOnlyHint: true,
+    },
+  },
 ];
 
 // Resource definitions (widget templates)
@@ -421,7 +458,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.10',
+              version: '1.5.16',
             },
           },
         };
@@ -774,23 +811,8 @@ async function executeTool(
       // Generate QR code
       const qrCodeBase64 = await generateQRCodeBase64(authorizationUrl);
 
-      // Build text content
+      // Build payment data for handoff to show_payment_widget
       const notificationSent = deviceAuth.notification_sent === true;
-      let textContent = `Checkout Ready for Payment\n`;
-      textContent += `==========================\n\n`;
-      textContent += `Items: ${itemNames}\n`;
-      textContent += `Total: ${currency} ${amount.toFixed(2)}\n\n`;
-
-      if (notificationSent) {
-        textContent += `Push notification sent to your phone.\n\n`;
-      }
-
-      textContent += `Authorize at: ${authorizationUrl}\n`;
-      textContent += `Code: ${deviceAuth.user_code}\n`;
-      textContent += `Expires in: ${Math.floor(deviceAuth.expires_in / 60)} minutes`;
-
-      // Payment data for widget - duplicated in _meta as workaround for SDK toolOutput bug
-      // Widget can access via toolResponseMetadata when toolOutput is null
       const paymentData = {
         checkout_session_id: sessionId,
         amount,
@@ -806,6 +828,9 @@ async function executeTool(
         expires_in: deviceAuth.expires_in,
       };
 
+      // Text instructs AI to call show_payment_widget (two-tool handoff pattern)
+      const textContent = `Payment authorization initiated. Now call show_payment_widget with the payment_data from this response to display the QR code to the user.`;
+
       return {
         content: [
           {
@@ -813,16 +838,11 @@ async function executeTool(
             text: textContent,
           },
         ],
-        // structuredContent -> toolOutput (visible to model)
+        // structuredContent contains payment_data for AI to pass to show_payment_widget
         structuredContent: {
-          ...paymentData,
-          __ping: 'structuredContent-checkout', // Diagnostic sentinel
-        },
-        _meta: {
-          'openai/outputTemplate': WIDGET_URI,
-          // Duplicate payment data in _meta for toolResponseMetadata fallback
-          ...paymentData,
-          __metaPing: 'meta-checkout', // Diagnostic sentinel
+          status: 'authorization_initiated',
+          instruction: 'Call show_payment_widget with payment_data to display widget',
+          payment_data: paymentData,
         },
       };
     }
@@ -928,22 +948,8 @@ async function executeTool(
       // Generate QR code
       const qrCodeBase64 = await generateQRCodeBase64(authorizationUrl);
 
-      // Build text content for non-widget clients
+      // Build payment data for handoff to show_payment_widget
       const notificationSent = deviceAuth.notification_sent === true;
-      let textContent = `Payment Authorization Required\n`;
-      textContent += `Amount: ${currency} ${amount.toFixed(2)}\n`;
-      textContent += `Merchant: ${merchantName}\n\n`;
-
-      if (notificationSent) {
-        textContent += `Push notification sent to your phone.\n\n`;
-      }
-
-      textContent += `Authorize at: ${authorizationUrl}\n`;
-      textContent += `Code: ${deviceAuth.user_code}\n`;
-      textContent += `Expires in: ${Math.floor(deviceAuth.expires_in / 60)} minutes`;
-
-      // Payment data for widget - duplicated in _meta as workaround for SDK toolOutput bug
-      // Widget can access via toolResponseMetadata when toolOutput is null
       const paymentData = {
         amount,
         currency,
@@ -958,7 +964,9 @@ async function executeTool(
         expires_in: deviceAuth.expires_in,
       };
 
-      // Return both text content and structured content for widget
+      // Text instructs AI to call show_payment_widget (two-tool handoff pattern)
+      const textContent = `Payment authorization initiated. Now call show_payment_widget with the payment_data from this response to display the QR code to the user.`;
+
       return {
         content: [
           {
@@ -966,16 +974,11 @@ async function executeTool(
             text: textContent,
           },
         ],
-        // structuredContent -> toolOutput (visible to model)
+        // structuredContent contains payment_data for AI to pass to show_payment_widget
         structuredContent: {
-          ...paymentData,
-          __ping: 'structuredContent-authorize', // Diagnostic sentinel
-        },
-        // Widget template reference + payment data for toolResponseMetadata fallback
-        _meta: {
-          'openai/outputTemplate': WIDGET_URI,
-          ...paymentData,
-          __metaPing: 'meta-authorize', // Diagnostic sentinel
+          status: 'authorization_initiated',
+          instruction: 'Call show_payment_widget with payment_data to display widget',
+          payment_data: paymentData,
         },
       };
     }
@@ -1059,6 +1062,55 @@ async function executeTool(
           token_type: tokenResult.token_type,
           expires_in: tokenResult.expires_in,
           message: 'Payment authorized successfully!',
+        },
+      };
+    }
+
+    // === Widget Rendering (Two-Tool Handoff) ===
+    case 'show_payment_widget': {
+      // This tool renders the widget with data already prepared by device_authorize or complete_checkout
+      // The widget mounts when this tool is invoked (because outputTemplate is in definition _meta)
+      // and receives payment_data immediately (no delay)
+      const paymentData = args.payment_data as Record<string, unknown>;
+
+      if (!paymentData) {
+        throw new Error('payment_data is required. Get it from device_authorize or complete_checkout response.');
+      }
+
+      // Build human-readable text fallback
+      const amount = paymentData.amount as number;
+      const currency = (paymentData.currency as string) || 'CAD';
+      const merchantName = paymentData.merchant_name as string;
+      const authUrl = paymentData.authorization_url as string;
+      const userCode = paymentData.user_code as string;
+      const expiresIn = paymentData.expires_in as number;
+
+      let textContent = `Payment Authorization\n`;
+      textContent += `=====================\n\n`;
+      textContent += `Amount: ${currency} ${amount?.toFixed(2) || '0.00'}\n`;
+      textContent += `Merchant: ${merchantName || 'Unknown'}\n\n`;
+      textContent += `Authorize at: ${authUrl || 'N/A'}\n`;
+      textContent += `Code: ${userCode || 'N/A'}\n`;
+      if (expiresIn) {
+        textContent += `Expires in: ${Math.floor(expiresIn / 60)} minutes`;
+      }
+
+      // Return with widget data - widget mounts with data ready immediately
+      return {
+        content: [
+          {
+            type: 'text',
+            text: textContent,
+          },
+        ],
+        // structuredContent -> toolOutput (widget reads this)
+        structuredContent: {
+          ...paymentData,
+        },
+        // _meta -> toolResponseMetadata (fallback for widget)
+        _meta: {
+          'openai/outputTemplate': WIDGET_URI,
+          ...paymentData,
         },
       };
     }
@@ -1172,7 +1224,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.10',
+      version: '1.5.16',
       timestamp: new Date().toISOString(),
     })
   );
