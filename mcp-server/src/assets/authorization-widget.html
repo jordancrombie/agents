@@ -286,57 +286,23 @@
   </div>
 
   <script>
-    // OpenAI Apps SDK bridge
+    // OpenAI Apps SDK bridge - Event-driven approach (not polling)
     let pollInterval = null;
     let deviceCode = null;
-    let dataLoadAttempts = 0;
-    const MAX_DATA_LOAD_ATTEMPTS = 60; // 60 attempts * 50ms = 3 seconds max wait (per OpenAI guidance)
+    let initialized = false;
 
-    // Diagnostic: check property existence properly (handles non-enumerable getters)
-    function diagnoseOpenAI() {
-      const openai = window.openai;
-      if (!openai) {
-        console.log('[SACP] window.openai is null/undefined');
-        return;
-      }
-
-      // Check property presence properly (non-enumerable getters won't show in Object.keys)
-      console.log('[SACP] "toolOutput" in openai:', 'toolOutput' in openai);
-      console.log('[SACP] "toolResponseMetadata" in openai:', 'toolResponseMetadata' in openai);
-      console.log('[SACP] "view" in openai:', 'view' in openai);
-
-      // Check property descriptors (reveals getters)
-      console.log('[SACP] toolOutput descriptor:', Object.getOwnPropertyDescriptor(openai, 'toolOutput'));
-      console.log('[SACP] toolResponseMetadata descriptor:', Object.getOwnPropertyDescriptor(openai, 'toolResponseMetadata'));
-
-      // Read actual values (re-read each time, don't cache)
-      console.log('[SACP] toolOutput value:', openai.toolOutput);
-      console.log('[SACP] toolResponseMetadata value:', openai.toolResponseMetadata);
-      console.log('[SACP] view value:', openai.view);
-
-      // Check for sentinel values we added for testing
-      if (openai.toolOutput) {
-        console.log('[SACP] toolOutput.__ping:', openai.toolOutput.__ping);
-      }
-      if (openai.toolResponseMetadata) {
-        console.log('[SACP] toolResponseMetadata.__metaPing:', openai.toolResponseMetadata.__metaPing);
-      }
-    }
-
-    // Get tool output data - reads directly from window.openai each time (no caching)
+    // Get tool output data - reads directly from window.openai
     function getToolData() {
-      // Always re-read from window.openai (don't cache - getters may update)
       if (!window.openai) return null;
 
-      // Primary: toolOutput contains structuredContent directly
-      // Read directly without destructuring (preserves getter semantics)
+      // Primary: toolOutput contains structuredContent
       const toolOutput = window.openai.toolOutput;
       if (toolOutput && typeof toolOutput === 'object') {
         console.log('[SACP] Found toolOutput:', toolOutput);
         return toolOutput;
       }
 
-      // Fallback: check toolResponseMetadata (_meta payload)
+      // Fallback: toolResponseMetadata contains _meta payload
       const toolResponseMetadata = window.openai.toolResponseMetadata;
       if (toolResponseMetadata && typeof toolResponseMetadata === 'object') {
         console.log('[SACP] Found toolResponseMetadata:', toolResponseMetadata);
@@ -346,51 +312,60 @@
       return null;
     }
 
-    // Wait for data with retries (handles async injection timing)
-    // Uses shorter interval (50ms) and more attempts (60 = 3 seconds) per OpenAI recommendation
-    function waitForData(callback) {
-      dataLoadAttempts++;
+    // Handle data when available - called from event or initial check
+    function handleData(data) {
+      if (initialized) return; // Prevent double initialization
+      initialized = true;
 
-      // Diagnostic on first and last attempt
-      if (dataLoadAttempts === 1 || dataLoadAttempts === MAX_DATA_LOAD_ATTEMPTS) {
-        console.log(`[SACP] Data load attempt ${dataLoadAttempts}/${MAX_DATA_LOAD_ATTEMPTS}`);
-        diagnoseOpenAI();
-      }
-
-      const data = getToolData();
-      if (data) {
-        console.log('[SACP] Data loaded successfully on attempt', dataLoadAttempts);
-        callback(data);
-        return;
-      }
-
-      if (dataLoadAttempts < MAX_DATA_LOAD_ATTEMPTS) {
-        // Retry after 50ms (per OpenAI suggestion)
-        setTimeout(() => waitForData(callback), 50);
-      } else {
-        // Give up after max attempts
-        console.warn('[SACP] Max data load attempts reached, showing error');
-        showError('Payment data not received. The widget may have loaded before data was ready.');
+      console.log('[SACP] Data received, initializing UI');
+      updateUI(data);
+      deviceCode = data.device_code;
+      if (deviceCode) {
+        startPolling(deviceCode);
       }
     }
 
-    async function initialize() {
-      try {
-        console.log('[SACP] Widget initializing...');
-        console.log('[SACP] window.openai exists:', !!window.openai);
+    // Initialize using event-driven approach (recommended by OpenAI)
+    function initialize() {
+      console.log('[SACP] Widget initializing (event-driven mode)...');
+      console.log('[SACP] window.openai exists:', !!window.openai);
 
-        // Wait for data with retries
-        waitForData((data) => {
-          updateUI(data);
-          deviceCode = data.device_code;
-          if (deviceCode) {
-            startPolling(deviceCode);
-          }
-        });
-      } catch (error) {
-        console.error('[SACP] Widget init error:', error);
-        showError('Failed to initialize: ' + error.message);
+      // Check if data is already available (host may have hydrated before our script ran)
+      const existingData = getToolData();
+      if (existingData) {
+        console.log('[SACP] Data already available on init');
+        handleData(existingData);
+        return;
       }
+
+      // Listen for the host's set_globals event (this is what React hooks use internally)
+      // Per OpenAI docs: host dispatches "openai:set_globals" when globals are updated
+      console.log('[SACP] Subscribing to openai:set_globals event...');
+
+      window.addEventListener('openai:set_globals', (event) => {
+        console.log('[SACP] Received openai:set_globals event', event);
+
+        const data = getToolData();
+        if (data) {
+          handleData(data);
+        } else {
+          console.warn('[SACP] set_globals fired but toolOutput still empty');
+        }
+      });
+
+      // Fallback timeout in case event never fires (shouldn't happen in normal flow)
+      setTimeout(() => {
+        if (!initialized) {
+          console.warn('[SACP] Timeout waiting for openai:set_globals event');
+          // One final check
+          const data = getToolData();
+          if (data) {
+            handleData(data);
+          } else {
+            showError('Payment data not received. Please try again.');
+          }
+        }
+      }, 5000); // 5 second timeout as fallback
     }
 
     function showError(msg) {
