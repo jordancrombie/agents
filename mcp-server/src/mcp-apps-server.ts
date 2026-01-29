@@ -32,7 +32,7 @@ const SSIM_BASE_URL = process.env.SSIM_BASE_URL || 'https://ssim.banksim.ca';
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.17';
+const WIDGET_VERSION = '1.5.18';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -145,7 +145,55 @@ const tools = [
     },
   },
 
-  // === Checkout ===
+  // === Unified Checkout (Primary - Single Tool) ===
+  {
+    name: 'checkout',
+    description:
+      'Complete a purchase in one step. Provide items, buyer info, and shipping address. Returns a payment authorization widget with QR code.',
+    _meta: {
+      'openai/outputTemplate': WIDGET_URI,
+      'openai/widgetCSP': WIDGET_CSP,
+      'openai/widgetDomain': WIDGET_DOMAIN,
+      'openai/toolInvocation/invoking': 'Processing checkout...',
+      'openai/toolInvocation/invoked': 'Payment widget displayed',
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              product_id: { type: 'string' },
+              quantity: { type: 'number' },
+            },
+            required: ['product_id', 'quantity'],
+          },
+          description: 'Array of items to purchase',
+        },
+        buyer_name: {
+          type: 'string',
+          description: 'Buyer full name',
+        },
+        buyer_email: {
+          type: 'string',
+          description: 'Buyer email address',
+        },
+        shipping_address: {
+          type: 'string',
+          description: 'Shipping address (optional for pickup)',
+        },
+      },
+      required: ['items', 'buyer_name', 'buyer_email'],
+    },
+    annotations: {
+      destructiveHint: false,
+      readOnlyHint: false,
+    },
+  },
+
+  // === Individual Checkout Tools (Advanced Use) ===
   {
     name: 'create_checkout',
     description: 'Create a new checkout session with items to purchase.',
@@ -234,7 +282,7 @@ const tools = [
   },
   {
     name: 'complete_checkout',
-    description: 'Complete a checkout session. This initiates device authorization for payment. After calling this, you MUST call show_payment_widget to display the QR code to the user.',
+    description: 'Complete a checkout session. This initiates device authorization for payment and returns the authorization data. For a better experience, use the unified "checkout" tool instead.',
     _meta: {
       'openai/toolInvocation/invoking': 'Processing payment authorization...',
       'openai/toolInvocation/invoked': 'Payment ready - display widget next',
@@ -303,7 +351,7 @@ const tools = [
   {
     name: 'device_authorize',
     description:
-      'Initiate device authorization for payment. After calling this, you MUST call show_payment_widget to display the QR code to the user.',
+      'Initiate device authorization for payment. Returns authorization data with QR code. For a better experience, use the unified "checkout" tool instead.',
     _meta: {
       'openai/toolInvocation/invoking': 'Processing payment authorization...',
       'openai/toolInvocation/invoked': 'Payment ready - display widget next',
@@ -366,47 +414,6 @@ const tools = [
     },
   },
 
-  // === Widget Rendering (Two-Tool Handoff) ===
-  {
-    name: 'show_payment_widget',
-    description:
-      'Display the payment authorization widget with QR code. Call this immediately after device_authorize or complete_checkout with the payment_data from their response.',
-    _meta: {
-      'openai/outputTemplate': WIDGET_URI,
-      'openai/widgetCSP': WIDGET_CSP,
-      'openai/widgetDomain': WIDGET_DOMAIN,
-      'openai/toolInvocation/invoking': 'Rendering payment widget...',
-      'openai/toolInvocation/invoked': 'Payment widget displayed',
-      'openai/widgetAccessible': true,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        payment_data: {
-          type: 'object',
-          description: 'The payment_data object from device_authorize or complete_checkout response',
-          properties: {
-            amount: { type: 'number' },
-            currency: { type: 'string' },
-            merchant_name: { type: 'string' },
-            description: { type: 'string' },
-            authorization_url: { type: 'string' },
-            user_code: { type: 'string' },
-            device_code: { type: 'string' },
-            qr_code_base64: { type: 'string' },
-            notification_sent: { type: 'boolean' },
-            expires_in: { type: 'number' },
-            checkout_session_id: { type: 'string' },
-          },
-        },
-      },
-      required: ['payment_data'],
-    },
-    annotations: {
-      destructiveHint: false,
-      readOnlyHint: true,
-    },
-  },
 ];
 
 // Resource definitions (widget templates)
@@ -434,7 +441,7 @@ async function handleMcpRequest(
     method: string;
     params?: Record<string, unknown>;
   },
-  sessionId: string
+  _sessionId: string
 ): Promise<{
   jsonrpc: string;
   id?: string | number;
@@ -458,7 +465,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.17',
+              version: '1.5.18',
             },
           },
         };
@@ -617,7 +624,163 @@ async function executeTool(
       };
     }
 
-    // === Checkout ===
+    // === Unified Checkout (Primary) ===
+    case 'checkout': {
+      const items = args.items as Array<{ product_id: string; quantity: number }>;
+      const buyerName = args.buyer_name as string;
+      const buyerEmail = args.buyer_email as string;
+      const shippingAddress = args.shipping_address as string | undefined;
+
+      // Step 1: Create checkout session with items
+      const createResponse = await fetch(`${SSIM_BASE_URL}/api/agent/v1/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      });
+
+      if (!createResponse.ok) {
+        const errorText = await createResponse.text();
+        throw new Error(`Failed to create checkout: ${createResponse.status} ${errorText}`);
+      }
+
+      const session = await createResponse.json() as { session_id: string };
+      const sessionId = session.session_id;
+
+      // Step 2: Update with buyer info
+      const updateData: Record<string, unknown> = {
+        buyer: { name: buyerName, email: buyerEmail },
+      };
+      if (shippingAddress) {
+        updateData.fulfillment = {
+          type: 'shipping',
+          address: { street: shippingAddress },
+        };
+      }
+
+      const updateResponse = await fetch(
+        `${SSIM_BASE_URL}/api/agent/v1/sessions/${sessionId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updateData),
+        }
+      );
+
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text();
+        throw new Error(`Failed to update checkout: ${updateResponse.status} ${errorText}`);
+      }
+
+      // Step 3: Get the updated checkout to know the total
+      const checkoutResponse = await fetch(
+        `${SSIM_BASE_URL}/api/agent/v1/sessions/${sessionId}`
+      );
+
+      if (!checkoutResponse.ok) {
+        throw new Error(`Failed to fetch checkout: ${checkoutResponse.status}`);
+      }
+
+      const checkout = await checkoutResponse.json() as {
+        session_id: string;
+        cart?: {
+          items?: Array<{ product_id: string; name: string; quantity: number; unit_price: number; subtotal: number }>;
+          total?: number;
+          currency?: string;
+        };
+      };
+
+      if (!checkout.cart || checkout.cart.total === undefined) {
+        throw new Error('Checkout cart is empty or has no total.');
+      }
+
+      // Build description from cart items
+      const itemNames = checkout.cart.items?.map(i => `${i.quantity}x ${i.name}`).join(', ') || 'Purchase';
+      const merchantName = 'SACP Demo Store';
+      const amount = checkout.cart.total;
+      const currency = checkout.cart.currency || 'CAD';
+
+      // Step 4: Initiate device authorization
+      const deviceAuthResponse = await fetch(
+        `${WSIM_BASE_URL}/api/agent/v1/oauth/device_authorization`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agent_name: merchantName,
+            agent_description: itemNames,
+            scope: 'browse cart purchase',
+            response_type: 'token',
+            spending_limits: {
+              per_transaction: amount.toString(),
+              currency,
+            },
+            buyer_email: buyerEmail,
+            checkout_session_id: sessionId,
+          }),
+        }
+      );
+
+      if (!deviceAuthResponse.ok) {
+        const errorText = await deviceAuthResponse.text();
+        throw new Error(`Device authorization failed: ${deviceAuthResponse.status} ${errorText}`);
+      }
+
+      const deviceAuth = (await deviceAuthResponse.json()) as {
+        device_code: string;
+        user_code: string;
+        verification_uri: string;
+        verification_uri_complete?: string;
+        expires_in: number;
+        notification_sent?: boolean;
+      };
+
+      // Build the authorization URL
+      const authorizationUrl =
+        deviceAuth.verification_uri_complete ||
+        `${deviceAuth.verification_uri}?code=${deviceAuth.user_code}`;
+
+      // Step 5: Generate QR code
+      const qrCodeBase64 = await generateQRCodeBase64(authorizationUrl);
+
+      // Build payment data for widget
+      const notificationSent = deviceAuth.notification_sent === true;
+      const paymentData = {
+        checkout_session_id: sessionId,
+        amount,
+        currency,
+        merchant_name: merchantName,
+        description: itemNames,
+        authorization_url: authorizationUrl,
+        user_code: deviceAuth.user_code,
+        device_code: deviceAuth.device_code,
+        verification_uri: deviceAuth.verification_uri,
+        qr_code_base64: qrCodeBase64,
+        notification_sent: notificationSent,
+        expires_in: deviceAuth.expires_in,
+      };
+
+      // Build human-readable text fallback
+      let textContent = `Payment Authorization\n`;
+      textContent += `=====================\n\n`;
+      textContent += `Amount: ${currency} ${amount.toFixed(2)}\n`;
+      textContent += `Merchant: ${merchantName}\n`;
+      textContent += `Items: ${itemNames}\n\n`;
+      textContent += `Authorize at: ${authorizationUrl}\n`;
+      textContent += `Code: ${deviceAuth.user_code}\n`;
+      textContent += `Expires in: ${Math.floor(deviceAuth.expires_in / 60)} minutes`;
+
+      // Return with widget data
+      return {
+        content: [{ type: 'text', text: textContent }],
+        structuredContent: { ...paymentData },
+        _meta: {
+          'openai/outputTemplate': WIDGET_URI,
+          ...paymentData,
+        },
+      };
+    }
+
+    // === Individual Checkout Tools (Advanced Use) ===
     case 'create_checkout': {
       const items = args.items as Array<{ product_id: string; quantity: number }>;
 
@@ -1066,55 +1229,6 @@ async function executeTool(
       };
     }
 
-    // === Widget Rendering (Two-Tool Handoff) ===
-    case 'show_payment_widget': {
-      // This tool renders the widget with data already prepared by device_authorize or complete_checkout
-      // The widget mounts when this tool is invoked (because outputTemplate is in definition _meta)
-      // and receives payment_data immediately (no delay)
-      const paymentData = args.payment_data as Record<string, unknown>;
-
-      if (!paymentData) {
-        throw new Error('payment_data is required. Get it from device_authorize or complete_checkout response.');
-      }
-
-      // Build human-readable text fallback
-      const amount = paymentData.amount as number;
-      const currency = (paymentData.currency as string) || 'CAD';
-      const merchantName = paymentData.merchant_name as string;
-      const authUrl = paymentData.authorization_url as string;
-      const userCode = paymentData.user_code as string;
-      const expiresIn = paymentData.expires_in as number;
-
-      let textContent = `Payment Authorization\n`;
-      textContent += `=====================\n\n`;
-      textContent += `Amount: ${currency} ${amount?.toFixed(2) || '0.00'}\n`;
-      textContent += `Merchant: ${merchantName || 'Unknown'}\n\n`;
-      textContent += `Authorize at: ${authUrl || 'N/A'}\n`;
-      textContent += `Code: ${userCode || 'N/A'}\n`;
-      if (expiresIn) {
-        textContent += `Expires in: ${Math.floor(expiresIn / 60)} minutes`;
-      }
-
-      // Return with widget data - widget mounts with data ready immediately
-      return {
-        content: [
-          {
-            type: 'text',
-            text: textContent,
-          },
-        ],
-        // structuredContent -> toolOutput (widget reads this)
-        structuredContent: {
-          ...paymentData,
-        },
-        // _meta -> toolResponseMetadata (fallback for widget)
-        _meta: {
-          'openai/outputTemplate': WIDGET_URI,
-          ...paymentData,
-        },
-      };
-    }
-
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -1224,7 +1338,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.17',
+      version: '1.5.18',
       timestamp: new Date().toISOString(),
     })
   );
