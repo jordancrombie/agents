@@ -287,94 +287,74 @@
 
   <script>
     // OpenAI Apps SDK bridge
-    const openai = window.openai;
     let pollInterval = null;
     let deviceCode = null;
+    let dataLoadAttempts = 0;
+    const MAX_DATA_LOAD_ATTEMPTS = 20; // 20 attempts * 100ms = 2 seconds max wait
+
+    // Get tool output data - handles timing issues where toolOutput may not be ready immediately
+    function getToolData() {
+      const openai = window.openai;
+      if (!openai) return null;
+
+      // Primary: toolOutput contains structuredContent directly
+      if (openai.toolOutput && typeof openai.toolOutput === 'object') {
+        console.log('[SACP] Found toolOutput:', openai.toolOutput);
+        return openai.toolOutput;
+      }
+
+      // Fallback: check toolResponseMetadata (_meta payload)
+      if (openai.toolResponseMetadata && typeof openai.toolResponseMetadata === 'object') {
+        console.log('[SACP] Found toolResponseMetadata:', openai.toolResponseMetadata);
+        return openai.toolResponseMetadata;
+      }
+
+      return null;
+    }
+
+    // Wait for data with retries (handles async injection timing)
+    function waitForData(callback) {
+      dataLoadAttempts++;
+      console.log(`[SACP] Data load attempt ${dataLoadAttempts}/${MAX_DATA_LOAD_ATTEMPTS}`);
+
+      const data = getToolData();
+      if (data) {
+        console.log('[SACP] Data loaded successfully:', data);
+        callback(data);
+        return;
+      }
+
+      if (dataLoadAttempts < MAX_DATA_LOAD_ATTEMPTS) {
+        // Retry after 100ms
+        setTimeout(() => waitForData(callback), 100);
+      } else {
+        // Give up after max attempts
+        console.warn('[SACP] Max data load attempts reached, showing error');
+        console.log('[SACP] window.openai state:', window.openai);
+        if (window.openai) {
+          console.log('[SACP] openai keys:', Object.keys(window.openai));
+          console.log('[SACP] openai.toolOutput:', window.openai.toolOutput);
+          console.log('[SACP] openai.toolResponseMetadata:', window.openai.toolResponseMetadata);
+        }
+        showError('Payment data not received. The widget may have loaded before data was ready.');
+      }
+    }
 
     async function initialize() {
       try {
-        // Try multiple ways to get the tool output
-        let data = null;
+        console.log('[SACP] Widget initializing...');
+        console.log('[SACP] window.openai exists:', !!window.openai);
 
-        // Debug: log what's available on window.openai
-        console.log('Widget init - openai object:', openai);
-        if (openai) {
-          console.log('openai keys:', Object.keys(openai));
-          console.log('openai.toolOutput:', openai.toolOutput);
-          console.log('openai.structuredContent:', openai.structuredContent);
-        }
-
-        // Method 1: Try toolOutput property (per SDK docs)
-        if (!data && openai && openai.toolOutput) {
-          console.log('Trying openai.toolOutput property');
-          data = openai.toolOutput;
-          // Check if it's wrapped in structuredContent
-          if (data && data.structuredContent) {
-            data = data.structuredContent;
-          }
-        }
-
-        // Method 2: Try structuredContent directly
-        if (!data && openai && openai.structuredContent) {
-          console.log('Trying openai.structuredContent');
-          data = openai.structuredContent;
-        }
-
-        // Method 3: Try getToolOutput() function
-        if (!data && openai && typeof openai.getToolOutput === 'function') {
-          console.log('Trying openai.getToolOutput()');
-          try {
-            const result = await openai.getToolOutput();
-            console.log('getToolOutput result:', result);
-            data = result;
-            // Check if it's wrapped in structuredContent
-            if (data && data.structuredContent) {
-              data = data.structuredContent;
-            }
-          } catch (e) {
-            console.warn('getToolOutput failed:', e);
-          }
-        }
-
-        // Method 4: Try toolResponseMetadata
-        if (!data && openai && openai.toolResponseMetadata) {
-          console.log('Trying openai.toolResponseMetadata');
-          data = openai.toolResponseMetadata;
-        }
-
-        // Fallback: URL params
-        if (!data) {
-          const params = new URLSearchParams(window.location.search);
-          const encoded = params.get('data');
-          if (encoded) {
-            console.log('Trying URL params fallback');
-            try {
-              data = JSON.parse(atob(encoded));
-            } catch (e) {
-              console.warn('URL data parse failed:', e);
-            }
-          }
-        }
-
-        // Fallback: window.TOOL_OUTPUT
-        if (!data && window.TOOL_OUTPUT) {
-          console.log('Trying window.TOOL_OUTPUT fallback');
-          data = window.TOOL_OUTPUT;
-        }
-
-        console.log('Final data:', data);
-
-        if (data) {
+        // Wait for data with retries
+        waitForData((data) => {
           updateUI(data);
           deviceCode = data.device_code;
           if (deviceCode) {
             startPolling(deviceCode);
           }
-        } else {
-          showError('Unable to load payment details. Check browser console for debug info.');
-        }
+        });
       } catch (error) {
-        console.error('Widget init error:', error);
+        console.error('[SACP] Widget init error:', error);
         showError('Failed to initialize: ' + error.message);
       }
     }

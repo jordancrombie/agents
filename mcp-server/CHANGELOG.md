@@ -5,6 +5,15 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.7] - 2026-01-29
+
+### Fixed
+- **Widget Async Data Loading**: Fixed known OpenAI Apps SDK timing issue
+  - `toolOutput` is null on initial widget load (known issue per OpenAI community)
+  - Implemented polling/retry mechanism (up to 2 seconds) to wait for data injection
+  - Use correct SDK API: `window.openai.toolOutput` property (not `getToolOutput()` function)
+  - Added `[SACP]` prefixed logging for easier debugging
+
 ## [1.5.6] - 2026-01-29
 
 ### Fixed
