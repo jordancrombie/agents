@@ -32,7 +32,7 @@ const SSIM_BASE_URL = process.env.SSIM_BASE_URL || 'https://ssim.banksim.ca';
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.14';
+const WIDGET_VERSION = '1.5.15';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -91,17 +91,9 @@ interface SessionRecord {
 const sessions = new Map<string, SessionRecord>();
 
 // Tool definitions with OpenAI Apps SDK metadata
-function getToolMeta() {
-  return {
-    'openai/outputTemplate': WIDGET_URI,
-    'openai/widgetCSP': WIDGET_CSP,
-    'openai/widgetDomain': WIDGET_DOMAIN,
-    'openai/toolInvocation/invoking': 'Processing payment authorization...',
-    'openai/toolInvocation/invoked': 'Authorization widget ready',
-    'openai/widgetAccessible': true,
-  };
-}
-
+// NOTE: Widget-rendering tools (complete_checkout, device_authorize) use Method B (result-driven):
+// - NO outputTemplate in tool definition (would cause early widget mount)
+// - Widget is triggered by ui:// resource in tool RESULT only
 const tools = [
   // === Store Discovery & Browsing ===
   {
@@ -246,7 +238,13 @@ const tools = [
   {
     name: 'complete_checkout',
     description: 'Complete a checkout session. This will initiate device authorization for payment and return a QR code widget.',
-    _meta: getToolMeta(),
+    _meta: {
+      // NO outputTemplate here - widget is triggered by ui:// resource in tool RESULT only
+      'openai/widgetCSP': WIDGET_CSP,
+      'openai/widgetDomain': WIDGET_DOMAIN,
+      'openai/toolInvocation/invoking': 'Processing payment...',
+      'openai/toolInvocation/invoked': 'Payment authorization ready',
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -312,7 +310,13 @@ const tools = [
     name: 'device_authorize',
     description:
       'Initiate device authorization for payment. Returns a QR code widget for the user to scan and authorize the payment.',
-    _meta: getToolMeta(),
+    _meta: {
+      // NO outputTemplate here - widget is triggered by ui:// resource in tool RESULT only
+      'openai/widgetCSP': WIDGET_CSP,
+      'openai/widgetDomain': WIDGET_DOMAIN,
+      'openai/toolInvocation/invoking': 'Processing payment...',
+      'openai/toolInvocation/invoked': 'Payment authorization ready',
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -421,7 +425,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.14',
+              version: '1.5.15',
             },
           },
         };
@@ -515,6 +519,14 @@ async function handleMcpRequest(
   }
 }
 
+// Content types for MCP tool results
+type TextContent = { type: 'text'; text: string };
+type ResourceContent = {
+  type: 'resource';
+  resource: { uri: string; mimeType: string; text: string };
+};
+type ContentItem = TextContent | ResourceContent;
+
 /**
  * Execute a tool and return the result
  */
@@ -522,7 +534,7 @@ async function executeTool(
   name: string,
   args: Record<string, unknown>
 ): Promise<{
-  content: Array<{ type: string; text: string }>;
+  content: ContentItem[];
   structuredContent?: Record<string, unknown>;
   _meta?: Record<string, unknown>;
 }> {
@@ -806,19 +818,32 @@ async function executeTool(
         expires_in: deviceAuth.expires_in,
       };
 
+      // Method B (result-driven): Include ui:// resource in result to trigger widget mount
+      // Widget only appears when this result arrives (not during tool invocation)
       return {
         content: [
           {
             type: 'text',
             text: textContent,
           },
+          {
+            type: 'resource',
+            resource: {
+              uri: WIDGET_URI,
+              mimeType: WIDGET_MIME_TYPE,
+              text: widgetTemplate,
+            },
+          },
         ],
         // structuredContent -> toolOutput (widget reads from here)
         structuredContent: {
           ...paymentData,
         },
-        // outputTemplate is in tool definition only (not here) to avoid double widget mount
-        _meta: {},
+        // Widget CSP/domain metadata (no outputTemplate - that's Method A)
+        _meta: {
+          'openai/widgetCSP': WIDGET_CSP,
+          'openai/widgetDomain': WIDGET_DOMAIN,
+        },
       };
     }
 
@@ -953,20 +978,32 @@ async function executeTool(
         expires_in: deviceAuth.expires_in,
       };
 
-      // Return both text content and structured content for widget
+      // Method B (result-driven): Include ui:// resource in result to trigger widget mount
+      // Widget only appears when this result arrives (not during tool invocation)
       return {
         content: [
           {
             type: 'text',
             text: textContent,
           },
+          {
+            type: 'resource',
+            resource: {
+              uri: WIDGET_URI,
+              mimeType: WIDGET_MIME_TYPE,
+              text: widgetTemplate,
+            },
+          },
         ],
         // structuredContent -> toolOutput (widget reads from here)
         structuredContent: {
           ...paymentData,
         },
-        // outputTemplate is in tool definition only (not here) to avoid double widget mount
-        _meta: {},
+        // Widget CSP/domain metadata (no outputTemplate - that's Method A)
+        _meta: {
+          'openai/widgetCSP': WIDGET_CSP,
+          'openai/widgetDomain': WIDGET_DOMAIN,
+        },
       };
     }
 
@@ -1162,7 +1199,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.14',
+      version: '1.5.15',
       timestamp: new Date().toISOString(),
     })
   );
