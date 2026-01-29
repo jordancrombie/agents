@@ -34,11 +34,15 @@ const WIDGET_URI = 'ui://widget/authorization.html';
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
 // Widget Content Security Policy - required for OpenAI Apps SDK submission
-// Allows inline scripts/styles for the widget, data: URIs for base64 QR code images
-const WIDGET_CSP =
-  "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'";
+// Our widget is self-contained: no external fetches, just inline scripts/styles and data: URIs for QR codes
+const WIDGET_CSP = {
+  connect_domains: [] as string[], // Widget doesn't fetch from external APIs
+  resource_domains: [] as string[], // No external static assets
+  // frame_domains omitted - we don't embed iframes
+};
 
 // Unique domain identifier for the widget - required for OpenAI Apps SDK submission
+// ChatGPT renders widgets under <domain>.web-sandbox.oaiusercontent.com
 const WIDGET_DOMAIN = 'sacp.banksim.ca';
 
 // Load widget template at startup
@@ -87,8 +91,8 @@ const sessions = new Map<string, SessionRecord>();
 function getToolMeta() {
   return {
     'openai/outputTemplate': WIDGET_URI,
-    'openai/outputTemplate/csp': WIDGET_CSP,
-    'openai/outputTemplate/domain': WIDGET_DOMAIN,
+    'openai/widgetCSP': WIDGET_CSP,
+    'openai/widgetDomain': WIDGET_DOMAIN,
     'openai/toolInvocation/invoking': 'Processing payment authorization...',
     'openai/toolInvocation/invoked': 'Authorization widget ready',
     'openai/widgetAccessible': true,
@@ -165,9 +169,11 @@ const resources = [
     mimeType: WIDGET_MIME_TYPE,
     name: 'Authorization Widget',
     description: 'Payment authorization widget with QR code display',
-    // OpenAI Apps SDK widget requirements
-    csp: WIDGET_CSP,
-    domain: WIDGET_DOMAIN,
+    // OpenAI Apps SDK widget requirements - must use _meta with correct field names
+    _meta: {
+      'openai/widgetCSP': WIDGET_CSP,
+      'openai/widgetDomain': WIDGET_DOMAIN,
+    },
   },
 ];
 
@@ -205,7 +211,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.0-beta.4',
+              version: '1.5.0-beta.5',
             },
           },
         };
@@ -257,9 +263,11 @@ async function handleMcpRequest(
                   uri: WIDGET_URI,
                   mimeType: WIDGET_MIME_TYPE,
                   text: widgetTemplate,
-                  // OpenAI Apps SDK widget requirements
-                  csp: WIDGET_CSP,
-                  domain: WIDGET_DOMAIN,
+                  // OpenAI Apps SDK widget requirements - must use _meta with correct field names
+                  _meta: {
+                    'openai/widgetCSP': WIDGET_CSP,
+                    'openai/widgetDomain': WIDGET_DOMAIN,
+                  },
                 },
               ],
             },
@@ -598,7 +606,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.0-beta.4',
+      version: '1.5.0-beta.5',
       timestamp: new Date().toISOString(),
     })
   );
