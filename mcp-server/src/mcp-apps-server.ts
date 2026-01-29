@@ -32,7 +32,7 @@ const SSIM_BASE_URL = process.env.SSIM_BASE_URL || 'https://ssim.banksim.ca';
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.13';
+const WIDGET_VERSION = '1.5.10';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -90,18 +90,17 @@ interface SessionRecord {
 
 const sessions = new Map<string, SessionRecord>();
 
-// Tool definition metadata (NOT including outputTemplate - that goes in result only)
-// outputTemplate in tool definition causes widget to render BEFORE result arrives
-function getToolDefinitionMeta() {
+// Tool definitions with OpenAI Apps SDK metadata
+function getToolMeta() {
   return {
-    // Invocation status messages (shown during tool execution)
+    'openai/outputTemplate': WIDGET_URI,
+    'openai/widgetCSP': WIDGET_CSP,
+    'openai/widgetDomain': WIDGET_DOMAIN,
     'openai/toolInvocation/invoking': 'Processing payment authorization...',
-    'openai/toolInvocation/invoked': 'Authorization complete',
+    'openai/toolInvocation/invoked': 'Authorization widget ready',
+    'openai/widgetAccessible': true,
   };
 }
-
-// NOTE: _meta in tool results should ONLY contain 'openai/outputTemplate'
-// Adding extra data to _meta breaks widget rendering
 
 const tools = [
   // === Store Discovery & Browsing ===
@@ -247,7 +246,7 @@ const tools = [
   {
     name: 'complete_checkout',
     description: 'Complete a checkout session. This will initiate device authorization for payment and return a QR code widget.',
-    _meta: getToolDefinitionMeta(),
+    _meta: getToolMeta(),
     inputSchema: {
       type: 'object',
       properties: {
@@ -313,7 +312,7 @@ const tools = [
     name: 'device_authorize',
     description:
       'Initiate device authorization for payment. Returns a QR code widget for the user to scan and authorize the payment.',
-    _meta: getToolDefinitionMeta(),
+    _meta: getToolMeta(),
     inputSchema: {
       type: 'object',
       properties: {
@@ -422,7 +421,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.13',
+              version: '1.5.10',
             },
           },
         };
@@ -814,12 +813,16 @@ async function executeTool(
             text: textContent,
           },
         ],
-        // structuredContent -> toolOutput (visible to model and widget)
-        structuredContent: paymentData,
-        // _meta ONLY contains outputTemplate - no other data!
-        // Extra fields in _meta may break widget rendering
+        // structuredContent -> toolOutput (visible to model)
+        structuredContent: {
+          ...paymentData,
+          __ping: 'structuredContent-checkout', // Diagnostic sentinel
+        },
         _meta: {
           'openai/outputTemplate': WIDGET_URI,
+          // Duplicate payment data in _meta for toolResponseMetadata fallback
+          ...paymentData,
+          __metaPing: 'meta-checkout', // Diagnostic sentinel
         },
       };
     }
@@ -963,12 +966,16 @@ async function executeTool(
             text: textContent,
           },
         ],
-        // structuredContent -> toolOutput (visible to model and widget)
-        structuredContent: paymentData,
-        // _meta ONLY contains outputTemplate - no other data!
-        // Extra fields in _meta may break widget rendering
+        // structuredContent -> toolOutput (visible to model)
+        structuredContent: {
+          ...paymentData,
+          __ping: 'structuredContent-authorize', // Diagnostic sentinel
+        },
+        // Widget template reference + payment data for toolResponseMetadata fallback
         _meta: {
           'openai/outputTemplate': WIDGET_URI,
+          ...paymentData,
+          __metaPing: 'meta-authorize', // Diagnostic sentinel
         },
       };
     }
@@ -1165,7 +1172,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.13',
+      version: '1.5.10',
       timestamp: new Date().toISOString(),
     })
   );
