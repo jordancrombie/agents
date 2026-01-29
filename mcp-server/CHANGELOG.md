@@ -5,6 +5,23 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0-beta.3] - 2026-01-29 (feature/mcp-ui-authorization branch)
+
+### Added
+- **Widget CSP and Domain**: Added required metadata for OpenAI Apps SDK submission
+  - Content Security Policy (CSP): `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'`
+  - Domain identifier: `sacp.banksim.ca`
+  - CSP and domain included in resource definition, resource read response, and tool metadata
+  - Resolves ChatGPT Apps wizard warnings about missing CSP and domain
+
+## [1.5.0-beta.2] - 2026-01-29 (feature/mcp-ui-authorization branch)
+
+### Fixed
+- **MCP SSE Transport**: Fixed endpoint path and added required `endpoint` event
+  - Changed POST endpoint from `/mcp/messages` to `/mcp/message` (singular)
+  - Added `endpoint` event emission after `session` event per MCP SSE transport spec
+  - Fixed ChatGPT Apps wizard hanging during MCP handshake
+
 ## [1.5.0-beta.1] - 2026-01-28 (feature/mcp-ui-authorization branch)
 
 ### Added
