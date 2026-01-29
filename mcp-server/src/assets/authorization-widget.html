@@ -318,20 +318,11 @@
       initialized = true;
 
       console.log('[SACP] Data received, initializing UI');
-
-      // Clear any error that may have been shown during timeout
-      hideError();
-
       updateUI(data);
       deviceCode = data.device_code;
       if (deviceCode) {
         startPolling(deviceCode);
       }
-    }
-
-    function hideError() {
-      const banner = document.getElementById('error-banner');
-      if (banner) banner.classList.add('hidden');
     }
 
     // Initialize using event-driven approach (recommended by OpenAI)
