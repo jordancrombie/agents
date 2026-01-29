@@ -32,7 +32,7 @@ const SSIM_BASE_URL = process.env.SSIM_BASE_URL || 'https://ssim.banksim.ca';
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.11';
+const WIDGET_VERSION = '1.5.12';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -100,12 +100,11 @@ function getToolDefinitionMeta() {
   };
 }
 
-// Tool RESULT metadata (includes outputTemplate to render widget with data)
+// Tool RESULT metadata - only outputTemplate needed here
+// widgetCSP and widgetDomain go in resource definitions, not results
 function getToolResultMeta() {
   return {
     'openai/outputTemplate': WIDGET_URI,
-    'openai/widgetCSP': WIDGET_CSP,
-    'openai/widgetDomain': WIDGET_DOMAIN,
   };
 }
 
@@ -428,7 +427,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.11',
+              version: '1.5.12',
             },
           },
         };
@@ -1179,7 +1178,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.11',
+      version: '1.5.12',
       timestamp: new Date().toISOString(),
     })
   );
