@@ -290,52 +290,86 @@
     let pollInterval = null;
     let deviceCode = null;
     let dataLoadAttempts = 0;
-    const MAX_DATA_LOAD_ATTEMPTS = 20; // 20 attempts * 100ms = 2 seconds max wait
+    const MAX_DATA_LOAD_ATTEMPTS = 60; // 60 attempts * 50ms = 3 seconds max wait (per OpenAI guidance)
 
-    // Get tool output data - handles timing issues where toolOutput may not be ready immediately
-    function getToolData() {
+    // Diagnostic: check property existence properly (handles non-enumerable getters)
+    function diagnoseOpenAI() {
       const openai = window.openai;
-      if (!openai) return null;
+      if (!openai) {
+        console.log('[SACP] window.openai is null/undefined');
+        return;
+      }
+
+      // Check property presence properly (non-enumerable getters won't show in Object.keys)
+      console.log('[SACP] "toolOutput" in openai:', 'toolOutput' in openai);
+      console.log('[SACP] "toolResponseMetadata" in openai:', 'toolResponseMetadata' in openai);
+      console.log('[SACP] "view" in openai:', 'view' in openai);
+
+      // Check property descriptors (reveals getters)
+      console.log('[SACP] toolOutput descriptor:', Object.getOwnPropertyDescriptor(openai, 'toolOutput'));
+      console.log('[SACP] toolResponseMetadata descriptor:', Object.getOwnPropertyDescriptor(openai, 'toolResponseMetadata'));
+
+      // Read actual values (re-read each time, don't cache)
+      console.log('[SACP] toolOutput value:', openai.toolOutput);
+      console.log('[SACP] toolResponseMetadata value:', openai.toolResponseMetadata);
+      console.log('[SACP] view value:', openai.view);
+
+      // Check for sentinel values we added for testing
+      if (openai.toolOutput) {
+        console.log('[SACP] toolOutput.__ping:', openai.toolOutput.__ping);
+      }
+      if (openai.toolResponseMetadata) {
+        console.log('[SACP] toolResponseMetadata.__metaPing:', openai.toolResponseMetadata.__metaPing);
+      }
+    }
+
+    // Get tool output data - reads directly from window.openai each time (no caching)
+    function getToolData() {
+      // Always re-read from window.openai (don't cache - getters may update)
+      if (!window.openai) return null;
 
       // Primary: toolOutput contains structuredContent directly
-      if (openai.toolOutput && typeof openai.toolOutput === 'object') {
-        console.log('[SACP] Found toolOutput:', openai.toolOutput);
-        return openai.toolOutput;
+      // Read directly without destructuring (preserves getter semantics)
+      const toolOutput = window.openai.toolOutput;
+      if (toolOutput && typeof toolOutput === 'object') {
+        console.log('[SACP] Found toolOutput:', toolOutput);
+        return toolOutput;
       }
 
       // Fallback: check toolResponseMetadata (_meta payload)
-      if (openai.toolResponseMetadata && typeof openai.toolResponseMetadata === 'object') {
-        console.log('[SACP] Found toolResponseMetadata:', openai.toolResponseMetadata);
-        return openai.toolResponseMetadata;
+      const toolResponseMetadata = window.openai.toolResponseMetadata;
+      if (toolResponseMetadata && typeof toolResponseMetadata === 'object') {
+        console.log('[SACP] Found toolResponseMetadata:', toolResponseMetadata);
+        return toolResponseMetadata;
       }
 
       return null;
     }
 
     // Wait for data with retries (handles async injection timing)
+    // Uses shorter interval (50ms) and more attempts (60 = 3 seconds) per OpenAI recommendation
     function waitForData(callback) {
       dataLoadAttempts++;
-      console.log(`[SACP] Data load attempt ${dataLoadAttempts}/${MAX_DATA_LOAD_ATTEMPTS}`);
+
+      // Diagnostic on first and last attempt
+      if (dataLoadAttempts === 1 || dataLoadAttempts === MAX_DATA_LOAD_ATTEMPTS) {
+        console.log(`[SACP] Data load attempt ${dataLoadAttempts}/${MAX_DATA_LOAD_ATTEMPTS}`);
+        diagnoseOpenAI();
+      }
 
       const data = getToolData();
       if (data) {
-        console.log('[SACP] Data loaded successfully:', data);
+        console.log('[SACP] Data loaded successfully on attempt', dataLoadAttempts);
         callback(data);
         return;
       }
 
       if (dataLoadAttempts < MAX_DATA_LOAD_ATTEMPTS) {
-        // Retry after 100ms
-        setTimeout(() => waitForData(callback), 100);
+        // Retry after 50ms (per OpenAI suggestion)
+        setTimeout(() => waitForData(callback), 50);
       } else {
         // Give up after max attempts
         console.warn('[SACP] Max data load attempts reached, showing error');
-        console.log('[SACP] window.openai state:', window.openai);
-        if (window.openai) {
-          console.log('[SACP] openai keys:', Object.keys(window.openai));
-          console.log('[SACP] openai.toolOutput:', window.openai.toolOutput);
-          console.log('[SACP] openai.toolResponseMetadata:', window.openai.toolResponseMetadata);
-        }
         showError('Payment data not received. The widget may have loaded before data was ready.');
       }
     }

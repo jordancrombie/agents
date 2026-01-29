@@ -32,7 +32,7 @@ const SSIM_BASE_URL = process.env.SSIM_BASE_URL || 'https://ssim.banksim.ca';
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.8';
+const WIDGET_VERSION = '1.5.9';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -421,7 +421,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.8',
+              version: '1.5.9',
             },
           },
         };
@@ -813,12 +813,16 @@ async function executeTool(
             text: textContent,
           },
         ],
-        structuredContent: paymentData,
+        // structuredContent -> toolOutput (visible to model)
+        structuredContent: {
+          ...paymentData,
+          __ping: 'structuredContent-checkout', // Diagnostic sentinel
+        },
         _meta: {
           'openai/outputTemplate': WIDGET_URI,
           // Duplicate payment data in _meta for toolResponseMetadata fallback
-          // This works around the SDK bug where toolOutput is null
           ...paymentData,
+          __metaPing: 'meta-checkout', // Diagnostic sentinel
         },
       };
     }
@@ -962,14 +966,16 @@ async function executeTool(
             text: textContent,
           },
         ],
-        // Structured content for widget consumption
-        structuredContent: paymentData,
+        // structuredContent -> toolOutput (visible to model)
+        structuredContent: {
+          ...paymentData,
+          __ping: 'structuredContent-authorize', // Diagnostic sentinel
+        },
         // Widget template reference + payment data for toolResponseMetadata fallback
         _meta: {
           'openai/outputTemplate': WIDGET_URI,
-          // Duplicate payment data in _meta for toolResponseMetadata fallback
-          // This works around the SDK bug where toolOutput is null
           ...paymentData,
+          __metaPing: 'meta-authorize', // Diagnostic sentinel
         },
       };
     }
@@ -1166,7 +1172,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.8',
+      version: '1.5.9',
       timestamp: new Date().toISOString(),
     })
   );
