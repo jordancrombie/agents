@@ -31,7 +31,9 @@ const WSIM_BASE_URL = process.env.WSIM_BASE_URL || 'https://wsim.banksim.ca';
 const SSIM_BASE_URL = process.env.SSIM_BASE_URL || 'https://ssim.banksim.ca';
 
 // Widget template configuration
-const WIDGET_URI = 'ui://widget/authorization.html';
+// Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
+const WIDGET_VERSION = '1.5.5';
+const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
 // Widget Content Security Policy - required for OpenAI Apps SDK submission
@@ -350,6 +352,8 @@ const tools = [
     _meta: {
       'openai/toolInvocation/invoking': 'Checking authorization status...',
       'openai/toolInvocation/invoked': 'Status checked',
+      // Allow widget to call this tool for status polling
+      'openai/widgetAccessible': true,
     },
     inputSchema: {
       type: 'object',
@@ -417,7 +421,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.4',
+              version: '1.5.5',
             },
           },
         };
@@ -1148,7 +1152,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.4',
+      version: '1.5.5',
       timestamp: new Date().toISOString(),
     })
   );

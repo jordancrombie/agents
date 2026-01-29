@@ -5,6 +5,16 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.5] - 2026-01-29
+
+### Fixed
+- **OpenAI Apps SDK Compliance**: Reviewed against SDK best practices guide
+  - Added `openai/widgetAccessible: true` to `device_authorize_status` tool
+    - Allows widget to call this tool for status polling via `window.openai.callTool()`
+    - May fix issue where tool was missing from ChatGPT's tool registry
+  - Added widget URI versioning for cache busting: `ui://widget/authorization-v1.5.5.html`
+    - Per SDK recommendation: "give the template a new URI so ChatGPT loads updated bundle"
+
 ## [1.5.4] - 2026-01-29
 
 ### Changed
