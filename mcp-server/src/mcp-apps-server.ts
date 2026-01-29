@@ -28,6 +28,7 @@ const __dirname = dirname(__filename);
 // Configuration
 const PORT = parseInt(process.env.PORT || '8000', 10);
 const WSIM_BASE_URL = process.env.WSIM_BASE_URL || 'https://wsim.banksim.ca';
+const SSIM_BASE_URL = process.env.SSIM_BASE_URL || 'https://ssim.banksim.ca';
 
 // Widget template configuration
 const WIDGET_URI = 'ui://widget/authorization.html';
@@ -100,6 +101,211 @@ function getToolMeta() {
 }
 
 const tools = [
+  // === Store Discovery & Browsing ===
+  {
+    name: 'browse_products',
+    description: 'Browse products available in the SACP Demo Store. Returns a list of products with prices.',
+    _meta: {
+      'openai/toolInvocation/invoking': 'Loading products...',
+      'openai/toolInvocation/invoked': 'Products loaded',
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query (optional)',
+        },
+        category: {
+          type: 'string',
+          description: 'Filter by category (optional)',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of results (default: 20)',
+        },
+      },
+    },
+    annotations: {
+      destructiveHint: false,
+      readOnlyHint: true,
+    },
+  },
+  {
+    name: 'get_product',
+    description: 'Get detailed information about a specific product.',
+    _meta: {
+      'openai/toolInvocation/invoking': 'Loading product details...',
+      'openai/toolInvocation/invoked': 'Product loaded',
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        product_id: {
+          type: 'string',
+          description: 'The product ID',
+        },
+      },
+      required: ['product_id'],
+    },
+    annotations: {
+      destructiveHint: false,
+      readOnlyHint: true,
+    },
+  },
+
+  // === Checkout ===
+  {
+    name: 'create_checkout',
+    description: 'Create a new checkout session with items to purchase.',
+    _meta: {
+      'openai/toolInvocation/invoking': 'Creating checkout...',
+      'openai/toolInvocation/invoked': 'Checkout created',
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              product_id: { type: 'string' },
+              quantity: { type: 'number' },
+            },
+            required: ['product_id', 'quantity'],
+          },
+          description: 'Array of items to add to cart',
+        },
+      },
+      required: ['items'],
+    },
+    annotations: {
+      destructiveHint: false,
+      readOnlyHint: false,
+    },
+  },
+  {
+    name: 'get_checkout',
+    description: 'Get the current status and details of a checkout session.',
+    _meta: {
+      'openai/toolInvocation/invoking': 'Loading checkout...',
+      'openai/toolInvocation/invoked': 'Checkout loaded',
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'The checkout session ID',
+        },
+      },
+      required: ['session_id'],
+    },
+    annotations: {
+      destructiveHint: false,
+      readOnlyHint: true,
+    },
+  },
+  {
+    name: 'update_checkout',
+    description: 'Update buyer information in a checkout session (name, email, shipping address).',
+    _meta: {
+      'openai/toolInvocation/invoking': 'Updating checkout...',
+      'openai/toolInvocation/invoked': 'Checkout updated',
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'The checkout session ID',
+        },
+        buyer_name: {
+          type: 'string',
+          description: 'Buyer full name',
+        },
+        buyer_email: {
+          type: 'string',
+          description: 'Buyer email address',
+        },
+        shipping_address: {
+          type: 'string',
+          description: 'Shipping address',
+        },
+      },
+      required: ['session_id'],
+    },
+    annotations: {
+      destructiveHint: false,
+      readOnlyHint: false,
+    },
+  },
+  {
+    name: 'complete_checkout',
+    description: 'Complete a checkout session. This will initiate device authorization for payment and return a QR code widget.',
+    _meta: getToolMeta(),
+    inputSchema: {
+      type: 'object',
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'The checkout session ID',
+        },
+      },
+      required: ['session_id'],
+    },
+    annotations: {
+      destructiveHint: false,
+      readOnlyHint: false,
+    },
+  },
+  {
+    name: 'cancel_checkout',
+    description: 'Cancel a checkout session.',
+    _meta: {
+      'openai/toolInvocation/invoking': 'Cancelling checkout...',
+      'openai/toolInvocation/invoked': 'Checkout cancelled',
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'The checkout session ID',
+        },
+      },
+      required: ['session_id'],
+    },
+    annotations: {
+      destructiveHint: true,
+      readOnlyHint: false,
+    },
+  },
+  {
+    name: 'get_order_status',
+    description: 'Get the status of a completed order.',
+    _meta: {
+      'openai/toolInvocation/invoking': 'Loading order...',
+      'openai/toolInvocation/invoked': 'Order loaded',
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        order_id: {
+          type: 'string',
+          description: 'The order ID',
+        },
+      },
+      required: ['order_id'],
+    },
+    annotations: {
+      destructiveHint: false,
+      readOnlyHint: true,
+    },
+  },
+
+  // === Device Authorization (Payment) ===
   {
     name: 'device_authorize',
     description:
@@ -211,7 +417,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.0-beta.5',
+              version: '1.5.0',
             },
           },
         };
@@ -317,6 +523,313 @@ async function executeTool(
   _meta?: Record<string, unknown>;
 }> {
   switch (name) {
+    // === Store Discovery & Browsing ===
+    case 'browse_products': {
+      const query = args.query as string | undefined;
+      const category = args.category as string | undefined;
+      const limit = (args.limit as number) || 20;
+
+      // Build query params
+      const params = new URLSearchParams();
+      if (query) params.set('query', query);
+      if (category) params.set('category', category);
+      params.set('limit', limit.toString());
+
+      const response = await fetch(
+        `${SSIM_BASE_URL}/api/products?${params.toString()}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch products: ${response.status}`);
+      }
+
+      const products = await response.json();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(products, null, 2),
+          },
+        ],
+      };
+    }
+
+    case 'get_product': {
+      const productId = args.product_id as string;
+
+      const response = await fetch(
+        `${SSIM_BASE_URL}/api/products/${productId}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch product: ${response.status}`);
+      }
+
+      const product = await response.json();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(product, null, 2),
+          },
+        ],
+      };
+    }
+
+    // === Checkout ===
+    case 'create_checkout': {
+      const items = args.items as Array<{ product_id: string; quantity: number }>;
+
+      const response = await fetch(`${SSIM_BASE_URL}/api/checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create checkout: ${response.status} ${errorText}`);
+      }
+
+      const checkout = await response.json();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(checkout, null, 2),
+          },
+        ],
+      };
+    }
+
+    case 'get_checkout': {
+      const sessionId = args.session_id as string;
+
+      const response = await fetch(
+        `${SSIM_BASE_URL}/api/checkout/${sessionId}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch checkout: ${response.status}`);
+      }
+
+      const checkout = await response.json();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(checkout, null, 2),
+          },
+        ],
+      };
+    }
+
+    case 'update_checkout': {
+      const sessionId = args.session_id as string;
+      const buyerName = args.buyer_name as string | undefined;
+      const buyerEmail = args.buyer_email as string | undefined;
+      const shippingAddress = args.shipping_address as string | undefined;
+
+      const updateData: Record<string, string> = {};
+      if (buyerName) updateData.buyer_name = buyerName;
+      if (buyerEmail) updateData.buyer_email = buyerEmail;
+      if (shippingAddress) updateData.shipping_address = shippingAddress;
+
+      const response = await fetch(
+        `${SSIM_BASE_URL}/api/checkout/${sessionId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updateData),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update checkout: ${response.status} ${errorText}`);
+      }
+
+      const checkout = await response.json();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(checkout, null, 2),
+          },
+        ],
+      };
+    }
+
+    case 'complete_checkout': {
+      const sessionId = args.session_id as string;
+
+      // First, get the checkout to know the total and buyer info
+      const checkoutResponse = await fetch(
+        `${SSIM_BASE_URL}/api/checkout/${sessionId}`
+      );
+
+      if (!checkoutResponse.ok) {
+        throw new Error(`Failed to fetch checkout: ${checkoutResponse.status}`);
+      }
+
+      const checkout = await checkoutResponse.json() as {
+        total: number;
+        currency?: string;
+        buyer_name?: string;
+        buyer_email?: string;
+        merchant_name?: string;
+        items?: Array<{ name: string; quantity: number }>;
+      };
+
+      // Build description from items
+      const itemNames = checkout.items?.map(i => `${i.quantity}x ${i.name}`).join(', ') || 'Purchase';
+      const merchantName = checkout.merchant_name || 'SACP Demo Store';
+
+      // Now initiate device authorization for the total
+      const amount = checkout.total;
+      const currency = checkout.currency || 'CAD';
+      const buyerEmail = checkout.buyer_email;
+
+      // Call WSIM device authorization endpoint
+      const deviceAuthResponse = await fetch(
+        `${WSIM_BASE_URL}/api/agent/v1/device_authorization`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            agent_name: merchantName,
+            agent_description: itemNames,
+            scope: 'browse cart purchase',
+            response_type: 'token',
+            spending_limits: {
+              per_transaction: amount.toString(),
+              currency,
+            },
+            buyer_email: buyerEmail,
+            checkout_session_id: sessionId,
+          }),
+        }
+      );
+
+      if (!deviceAuthResponse.ok) {
+        const errorText = await deviceAuthResponse.text();
+        throw new Error(
+          `Device authorization failed: ${deviceAuthResponse.status} ${errorText}`
+        );
+      }
+
+      const deviceAuth = (await deviceAuthResponse.json()) as {
+        device_code: string;
+        user_code: string;
+        verification_uri: string;
+        verification_uri_complete?: string;
+        expires_in: number;
+        notification_sent?: boolean;
+      };
+
+      // Build the authorization URL
+      const authorizationUrl =
+        deviceAuth.verification_uri_complete ||
+        `${deviceAuth.verification_uri}?code=${deviceAuth.user_code}`;
+
+      // Generate QR code
+      const qrCodeBase64 = await generateQRCodeBase64(authorizationUrl);
+
+      // Build text content
+      const notificationSent = deviceAuth.notification_sent === true;
+      let textContent = `Checkout Ready for Payment\n`;
+      textContent += `==========================\n\n`;
+      textContent += `Items: ${itemNames}\n`;
+      textContent += `Total: ${currency} ${amount.toFixed(2)}\n\n`;
+
+      if (notificationSent) {
+        textContent += `Push notification sent to your phone.\n\n`;
+      }
+
+      textContent += `Authorize at: ${authorizationUrl}\n`;
+      textContent += `Code: ${deviceAuth.user_code}\n`;
+      textContent += `Expires in: ${Math.floor(deviceAuth.expires_in / 60)} minutes`;
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: textContent,
+          },
+        ],
+        structuredContent: {
+          checkout_session_id: sessionId,
+          amount,
+          currency,
+          merchant_name: merchantName,
+          description: itemNames,
+          authorization_url: authorizationUrl,
+          user_code: deviceAuth.user_code,
+          device_code: deviceAuth.device_code,
+          verification_uri: deviceAuth.verification_uri,
+          qr_code_base64: qrCodeBase64,
+          notification_sent: notificationSent,
+          expires_in: deviceAuth.expires_in,
+        },
+        _meta: {
+          'openai/outputTemplate': WIDGET_URI,
+        },
+      };
+    }
+
+    case 'cancel_checkout': {
+      const sessionId = args.session_id as string;
+
+      const response = await fetch(
+        `${SSIM_BASE_URL}/api/checkout/${sessionId}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to cancel checkout: ${response.status}`);
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Checkout cancelled successfully.',
+          },
+        ],
+      };
+    }
+
+    case 'get_order_status': {
+      const orderId = args.order_id as string;
+
+      const response = await fetch(
+        `${SSIM_BASE_URL}/api/orders/${orderId}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch order: ${response.status}`);
+      }
+
+      const order = await response.json();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(order, null, 2),
+          },
+        ],
+      };
+    }
+
+    // === Device Authorization (Payment) ===
     case 'device_authorize': {
       const amount = args.amount as number;
       const currency = (args.currency as string) || 'CAD';
@@ -606,7 +1119,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.0-beta.5',
+      version: '1.5.0',
       timestamp: new Date().toISOString(),
     })
   );

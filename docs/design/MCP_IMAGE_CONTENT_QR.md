@@ -231,9 +231,17 @@ OpenAI's [Apps SDK](https://developers.openai.com/apps-sdk/build/mcp-server) pro
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  ChatGPT App    │────▶│  MCP Apps       │────▶│     WSIM        │
-│  (UI Client)    │     │  Server (HTTP)  │     │  (Auth Server)  │
+│  ChatGPT App    │────▶│  MCP Apps       │────▶│     SSIM        │
+│  (UI Client)    │     │  Server (HTTP)  │     │  (Store API)    │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
+        │                       │                        │
+        │                       │                        │ Products,
+        │                       │                        │ Checkout
+        │                       │                        ▼
+        │                       │               ┌─────────────────┐
+        │                       └──────────────▶│     WSIM        │
+        │                                       │  (Auth Server)  │
+        │                                       └─────────────────┘
         │                       │
         │                       │ Widget Template
         │                       │ (text/html+skybridge)
@@ -257,6 +265,25 @@ OpenAI's [Apps SDK](https://developers.openai.com/apps-sdk/build/mcp-server) pro
 
 - `mcp-server/src/mcp-apps-server.ts` - HTTP transport MCP server
 - `mcp-server/src/assets/authorization-widget.html` - Widget template
+
+### Available Tools (v1.5.0-beta.6)
+
+The MCP Apps server provides full shopping functionality:
+
+| Category | Tool | Description |
+|----------|------|-------------|
+| **Browsing** | `browse_products` | Browse products in SACP Demo Store |
+| | `get_product` | Get detailed product information |
+| **Checkout** | `create_checkout` | Create checkout session with items |
+| | `get_checkout` | Get checkout session details |
+| | `update_checkout` | Update buyer info (name, email, address) |
+| | `complete_checkout` | Complete checkout → device auth with QR widget |
+| | `cancel_checkout` | Cancel a checkout session |
+| **Orders** | `get_order_status` | Get order status |
+| **Payment** | `device_authorize` | Direct device authorization (standalone) |
+| | `device_authorize_status` | Poll authorization status |
+
+Tools that return QR codes (`complete_checkout`, `device_authorize`) include widget metadata for rich UI rendering.
 
 ### Widget Template Pattern
 

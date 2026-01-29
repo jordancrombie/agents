@@ -5,6 +5,37 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-01-29
+
+### Added
+- **ChatGPT Apps SDK Integration**: Full MCP server for OpenAI Apps SDK with rich widget UI
+  - HTTP transport MCP server with SSE connections (`src/mcp-apps-server.ts`)
+  - Authorization widget with QR code display (`src/assets/authorization-widget.html`)
+  - Widget templates using `text/html+skybridge` MIME type
+  - OpenAI Apps SDK metadata: `openai/widgetCSP`, `openai/widgetDomain`, `openai/outputTemplate`
+
+- **Full Shopping Tools for ChatGPT Apps** (10 tools total):
+  - `browse_products`: Browse products in SACP Demo Store
+  - `get_product`: Get detailed product information
+  - `create_checkout`: Create checkout session with items
+  - `get_checkout`: Get checkout session details
+  - `update_checkout`: Update buyer info (name, email, address)
+  - `complete_checkout`: Complete checkout → device auth with QR widget
+  - `cancel_checkout`: Cancel a checkout session
+  - `get_order_status`: Get order status
+  - `device_authorize`: Direct device authorization (standalone)
+  - `device_authorize_status`: Poll authorization status
+
+- **MCP ImageContent for QR Codes**: Claude Desktop and MCP clients can render QR codes natively
+  - Uses MCP specification's ImageContent type: `{ type: 'image', data: base64, mimeType: 'image/png' }`
+  - Solves UI transport capability mismatch between ChatGPT (text-only) and MCP (structured content)
+
+### Technical Details
+- QR codes generated server-side using `qrcode` npm package
+- Widget CSP: self-contained with no external fetches (inline scripts/styles, data: URIs)
+- Endpoints: `GET /mcp` (SSE), `POST /mcp/message`, `GET /health`
+- Connects to SSIM (products/checkout) and WSIM (device authorization)
+
 ## [1.5.0-beta.3] - 2026-01-29 (feature/mcp-ui-authorization branch)
 
 ### Added
