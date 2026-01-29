@@ -32,7 +32,7 @@ const SSIM_BASE_URL = process.env.SSIM_BASE_URL || 'https://ssim.banksim.ca';
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.10';
+const WIDGET_VERSION = '1.5.11';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -90,15 +90,22 @@ interface SessionRecord {
 
 const sessions = new Map<string, SessionRecord>();
 
-// Tool definitions with OpenAI Apps SDK metadata
-function getToolMeta() {
+// Tool definition metadata (NOT including outputTemplate - that goes in result only)
+// outputTemplate in tool definition causes widget to render BEFORE result arrives
+function getToolDefinitionMeta() {
+  return {
+    // Invocation status messages (shown during tool execution)
+    'openai/toolInvocation/invoking': 'Processing payment authorization...',
+    'openai/toolInvocation/invoked': 'Authorization complete',
+  };
+}
+
+// Tool RESULT metadata (includes outputTemplate to render widget with data)
+function getToolResultMeta() {
   return {
     'openai/outputTemplate': WIDGET_URI,
     'openai/widgetCSP': WIDGET_CSP,
     'openai/widgetDomain': WIDGET_DOMAIN,
-    'openai/toolInvocation/invoking': 'Processing payment authorization...',
-    'openai/toolInvocation/invoked': 'Authorization widget ready',
-    'openai/widgetAccessible': true,
   };
 }
 
@@ -246,7 +253,7 @@ const tools = [
   {
     name: 'complete_checkout',
     description: 'Complete a checkout session. This will initiate device authorization for payment and return a QR code widget.',
-    _meta: getToolMeta(),
+    _meta: getToolDefinitionMeta(),
     inputSchema: {
       type: 'object',
       properties: {
@@ -312,7 +319,7 @@ const tools = [
     name: 'device_authorize',
     description:
       'Initiate device authorization for payment. Returns a QR code widget for the user to scan and authorize the payment.',
-    _meta: getToolMeta(),
+    _meta: getToolDefinitionMeta(),
     inputSchema: {
       type: 'object',
       properties: {
@@ -421,7 +428,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.10',
+              version: '1.5.11',
             },
           },
         };
@@ -819,7 +826,7 @@ async function executeTool(
           __ping: 'structuredContent-checkout', // Diagnostic sentinel
         },
         _meta: {
-          'openai/outputTemplate': WIDGET_URI,
+          ...getToolResultMeta(),
           // Duplicate payment data in _meta for toolResponseMetadata fallback
           ...paymentData,
           __metaPing: 'meta-checkout', // Diagnostic sentinel
@@ -973,7 +980,7 @@ async function executeTool(
         },
         // Widget template reference + payment data for toolResponseMetadata fallback
         _meta: {
-          'openai/outputTemplate': WIDGET_URI,
+          ...getToolResultMeta(),
           ...paymentData,
           __metaPing: 'meta-authorize', // Diagnostic sentinel
         },
@@ -1172,7 +1179,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.10',
+      version: '1.5.11',
       timestamp: new Date().toISOString(),
     })
   );
