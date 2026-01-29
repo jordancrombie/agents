@@ -7,7 +7,7 @@
  *
  * Endpoints:
  * - GET /mcp - SSE connection for MCP transport
- * - POST /mcp/messages - Message endpoint for MCP requests
+ * - POST /mcp/message - Message endpoint for MCP requests
  * - GET /health - Health check
  *
  * This server enables ChatGPT Apps to render QR codes and authorization UI
@@ -79,6 +79,8 @@ const sessions = new Map<string, SessionRecord>();
 function getToolMeta() {
   return {
     'openai/outputTemplate': WIDGET_URI,
+    'openai/outputTemplate/csp': WIDGET_CSP,
+    'openai/outputTemplate/domain': WIDGET_DOMAIN,
     'openai/toolInvocation/invoking': 'Processing payment authorization...',
     'openai/toolInvocation/invoked': 'Authorization widget ready',
     'openai/widgetAccessible': true,
@@ -149,12 +151,23 @@ const tools = [
 ];
 
 // Resource definitions (widget templates)
+// Widget Content Security Policy - required for OpenAI Apps SDK submission
+// Allows inline scripts/styles for the widget, data: URIs for base64 QR code images
+const WIDGET_CSP =
+  "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'";
+
+// Unique domain identifier for the widget - required for OpenAI Apps SDK submission
+const WIDGET_DOMAIN = 'sacp.banksim.ca';
+
 const resources = [
   {
     uri: WIDGET_URI,
     mimeType: WIDGET_MIME_TYPE,
     name: 'Authorization Widget',
     description: 'Payment authorization widget with QR code display',
+    // OpenAI Apps SDK widget requirements
+    csp: WIDGET_CSP,
+    domain: WIDGET_DOMAIN,
   },
 ];
 
@@ -192,7 +205,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.0-beta.1',
+              version: '1.5.0-beta.3',
             },
           },
         };
@@ -244,6 +257,9 @@ async function handleMcpRequest(
                   uri: WIDGET_URI,
                   mimeType: WIDGET_MIME_TYPE,
                   text: widgetTemplate,
+                  // OpenAI Apps SDK widget requirements
+                  csp: WIDGET_CSP,
+                  domain: WIDGET_DOMAIN,
                 },
               ],
             },
@@ -503,6 +519,9 @@ function handleSseRequest(res: ServerResponse) {
   // Send session ID to client
   res.write(`event: session\ndata: ${JSON.stringify({ sessionId })}\n\n`);
 
+  // Send endpoint event telling client where to POST messages (MCP SSE transport requirement)
+  res.write(`event: endpoint\ndata: /mcp/message?sessionId=${sessionId}\n\n`);
+
   // Heartbeat to keep connection alive
   const heartbeat = setInterval(() => {
     res.write(': heartbeat\n\n');
@@ -579,7 +598,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.0-beta.1',
+      version: '1.5.0-beta.3',
       timestamp: new Date().toISOString(),
     })
   );
@@ -623,7 +642,7 @@ const httpServer = createServer(async (req, res) => {
   }
 
   // Message endpoint
-  if (req.method === 'POST' && url.pathname === '/mcp/messages') {
+  if (req.method === 'POST' && url.pathname === '/mcp/message') {
     await handlePostMessage(req, res, url);
     return;
   }
