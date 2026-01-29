@@ -32,7 +32,7 @@ const SSIM_BASE_URL = process.env.SSIM_BASE_URL || 'https://ssim.banksim.ca';
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.7';
+const WIDGET_VERSION = '1.5.8';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -421,7 +421,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.7',
+              version: '1.5.8',
             },
           },
         };
@@ -789,6 +789,23 @@ async function executeTool(
       textContent += `Code: ${deviceAuth.user_code}\n`;
       textContent += `Expires in: ${Math.floor(deviceAuth.expires_in / 60)} minutes`;
 
+      // Payment data for widget - duplicated in _meta as workaround for SDK toolOutput bug
+      // Widget can access via toolResponseMetadata when toolOutput is null
+      const paymentData = {
+        checkout_session_id: sessionId,
+        amount,
+        currency,
+        merchant_name: merchantName,
+        description: itemNames,
+        authorization_url: authorizationUrl,
+        user_code: deviceAuth.user_code,
+        device_code: deviceAuth.device_code,
+        verification_uri: deviceAuth.verification_uri,
+        qr_code_base64: qrCodeBase64,
+        notification_sent: notificationSent,
+        expires_in: deviceAuth.expires_in,
+      };
+
       return {
         content: [
           {
@@ -796,22 +813,12 @@ async function executeTool(
             text: textContent,
           },
         ],
-        structuredContent: {
-          checkout_session_id: sessionId,
-          amount,
-          currency,
-          merchant_name: merchantName,
-          description: itemNames,
-          authorization_url: authorizationUrl,
-          user_code: deviceAuth.user_code,
-          device_code: deviceAuth.device_code,
-          verification_uri: deviceAuth.verification_uri,
-          qr_code_base64: qrCodeBase64,
-          notification_sent: notificationSent,
-          expires_in: deviceAuth.expires_in,
-        },
+        structuredContent: paymentData,
         _meta: {
           'openai/outputTemplate': WIDGET_URI,
+          // Duplicate payment data in _meta for toolResponseMetadata fallback
+          // This works around the SDK bug where toolOutput is null
+          ...paymentData,
         },
       };
     }
@@ -931,6 +938,22 @@ async function executeTool(
       textContent += `Code: ${deviceAuth.user_code}\n`;
       textContent += `Expires in: ${Math.floor(deviceAuth.expires_in / 60)} minutes`;
 
+      // Payment data for widget - duplicated in _meta as workaround for SDK toolOutput bug
+      // Widget can access via toolResponseMetadata when toolOutput is null
+      const paymentData = {
+        amount,
+        currency,
+        merchant_name: merchantName,
+        description,
+        authorization_url: authorizationUrl,
+        user_code: deviceAuth.user_code,
+        device_code: deviceAuth.device_code,
+        verification_uri: deviceAuth.verification_uri,
+        qr_code_base64: qrCodeBase64,
+        notification_sent: notificationSent,
+        expires_in: deviceAuth.expires_in,
+      };
+
       // Return both text content and structured content for widget
       return {
         content: [
@@ -940,22 +963,13 @@ async function executeTool(
           },
         ],
         // Structured content for widget consumption
-        structuredContent: {
-          amount,
-          currency,
-          merchant_name: merchantName,
-          description,
-          authorization_url: authorizationUrl,
-          user_code: deviceAuth.user_code,
-          device_code: deviceAuth.device_code,
-          verification_uri: deviceAuth.verification_uri,
-          qr_code_base64: qrCodeBase64,
-          notification_sent: notificationSent,
-          expires_in: deviceAuth.expires_in,
-        },
-        // Widget template reference
+        structuredContent: paymentData,
+        // Widget template reference + payment data for toolResponseMetadata fallback
         _meta: {
           'openai/outputTemplate': WIDGET_URI,
+          // Duplicate payment data in _meta for toolResponseMetadata fallback
+          // This works around the SDK bug where toolOutput is null
+          ...paymentData,
         },
       };
     }
@@ -1152,7 +1166,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.7',
+      version: '1.5.8',
       timestamp: new Date().toISOString(),
     })
   );
