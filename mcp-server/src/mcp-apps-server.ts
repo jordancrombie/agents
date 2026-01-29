@@ -417,7 +417,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.3',
+              version: '1.5.4',
             },
           },
         };
@@ -1148,7 +1148,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.3',
+      version: '1.5.4',
       timestamp: new Date().toISOString(),
     })
   );

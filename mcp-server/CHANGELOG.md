@@ -5,6 +5,17 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.4] - 2026-01-29
+
+### Changed
+- **Widget UI Redesign**: Authorization widget now has dark theme matching ChatGPT's interface
+  - Transparent background with dark card design
+  - Integrated look with key-value detail rows (Merchant, Items, Amount)
+  - QR code in white container for contrast
+  - Cleaner button styling matching ChatGPT's design language
+  - Better error handling with fallback data loading methods
+  - Status bar at bottom with pulse animation
+
 ## [1.5.3] - 2026-01-29
 
 ### Fixed

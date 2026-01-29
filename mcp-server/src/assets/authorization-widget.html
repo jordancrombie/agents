@@ -12,208 +12,271 @@
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f8f9fa;
-      color: #1a1a1a;
-      padding: 16px;
-      min-height: 100vh;
+      background: transparent;
+      color: #e4e4e7;
+      padding: 0;
+      margin: 0;
     }
-    .container {
-      max-width: 400px;
-      margin: 0 auto;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    .card {
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 16px;
       overflow: hidden;
+      max-width: 420px;
     }
     .header {
-      background: linear-gradient(135deg, #2d6cdf 0%, #1a4fa0 100%);
-      color: white;
-      padding: 20px;
-      text-align: center;
+      padding: 20px 24px;
+      border-bottom: 1px solid #3f3f46;
     }
-    .header h1 {
+    .header-title {
       font-size: 18px;
       font-weight: 600;
-      margin-bottom: 4px;
+      color: #fafafa;
+      margin-bottom: 8px;
     }
-    .header .amount {
-      font-size: 32px;
-      font-weight: 700;
-      margin: 8px 0;
-    }
-    .header .merchant {
+    .header-subtitle {
       font-size: 14px;
-      opacity: 0.9;
+      color: #a1a1aa;
+      line-height: 1.5;
     }
-    .content {
-      padding: 20px;
+    .details {
+      padding: 20px 24px;
+      border-bottom: 1px solid #3f3f46;
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+    }
+    .detail-row:not(:last-child) {
+      border-bottom: 1px solid #3f3f46;
+    }
+    .detail-label {
+      font-size: 14px;
+      color: #a1a1aa;
+    }
+    .detail-value {
+      font-size: 14px;
+      color: #fafafa;
+      font-weight: 500;
+      text-align: right;
+      max-width: 60%;
+      word-break: break-word;
+    }
+    .qr-section {
+      padding: 24px;
+      text-align: center;
+      border-bottom: 1px solid #3f3f46;
     }
     .qr-container {
-      text-align: center;
+      background: #fafafa;
+      border-radius: 12px;
       padding: 16px;
-      background: #f8f9fa;
-      border-radius: 8px;
-      margin-bottom: 16px;
+      display: inline-block;
+      margin-bottom: 12px;
     }
     .qr-container img {
-      max-width: 180px;
-      height: auto;
-      border-radius: 4px;
+      width: 160px;
+      height: 160px;
+      display: block;
     }
     .qr-label {
-      font-size: 12px;
-      color: #666;
-      margin-top: 8px;
+      font-size: 13px;
+      color: #71717a;
     }
     .divider {
       display: flex;
       align-items: center;
-      margin: 16px 0;
-      color: #999;
+      padding: 0 24px;
+      color: #71717a;
       font-size: 12px;
     }
     .divider::before, .divider::after {
       content: '';
       flex: 1;
-      border-bottom: 1px solid #e0e0e0;
+      border-bottom: 1px solid #3f3f46;
     }
     .divider span {
-      padding: 0 12px;
-    }
-    .auth-link {
-      display: block;
-      background: #2d6cdf;
-      color: white;
-      text-decoration: none;
-      text-align: center;
-      padding: 14px 20px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 15px;
-      margin-bottom: 12px;
-      transition: background 0.2s;
-    }
-    .auth-link:hover {
-      background: #1a4fa0;
+      padding: 12px 16px;
     }
     .code-section {
-      background: #f8f9fa;
-      border-radius: 8px;
-      padding: 12px;
+      padding: 16px 24px;
       text-align: center;
     }
     .code-label {
       font-size: 12px;
-      color: #666;
-      margin-bottom: 4px;
+      color: #71717a;
+      margin-bottom: 6px;
     }
     .code-value {
-      font-family: 'SF Mono', Monaco, monospace;
-      font-size: 24px;
+      font-family: 'SF Mono', Monaco, Consolas, monospace;
+      font-size: 20px;
       font-weight: 700;
-      color: #1a1a1a;
-      letter-spacing: 2px;
+      color: #fafafa;
+      letter-spacing: 1px;
+      padding: 10px 16px;
+      background: #18181b;
+      border-radius: 8px;
+      display: inline-block;
+    }
+    .actions {
+      padding: 20px 24px;
+      display: flex;
+      gap: 12px;
+    }
+    .btn {
+      flex: 1;
+      padding: 14px 20px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      text-align: center;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
+    }
+    .btn-primary {
+      background: #fafafa;
+      color: #18181b;
+    }
+    .btn-primary:hover {
+      background: #e4e4e7;
+    }
+    .btn-secondary {
+      background: transparent;
+      color: #fafafa;
+      border: 1px solid #3f3f46;
+    }
+    .btn-secondary:hover {
+      background: #3f3f46;
     }
     .status-bar {
-      padding: 16px 20px;
-      border-top: 1px solid #e0e0e0;
+      padding: 14px 24px;
+      background: #18181b;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 10px;
     }
     .status-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: #ffc107;
+      background: #facc15;
       animation: pulse 1.5s ease-in-out infinite;
     }
     .status-dot.approved {
-      background: #28a745;
+      background: #22c55e;
       animation: none;
     }
     .status-dot.denied {
-      background: #dc3545;
+      background: #ef4444;
       animation: none;
     }
     .status-dot.expired {
-      background: #6c757d;
+      background: #71717a;
       animation: none;
     }
     @keyframes pulse {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+      50% { opacity: 0.4; }
     }
     .status-text {
       font-size: 13px;
-      color: #666;
+      color: #a1a1aa;
     }
     .status-text.approved {
-      color: #28a745;
-      font-weight: 600;
+      color: #22c55e;
     }
     .status-text.denied {
-      color: #dc3545;
+      color: #ef4444;
     }
     .notification-badge {
-      background: #28a745;
-      color: white;
-      padding: 8px 12px;
+      background: #166534;
+      color: #bbf7d0;
+      padding: 10px 16px;
       border-radius: 8px;
       font-size: 13px;
-      margin-bottom: 16px;
+      margin: 0 24px 16px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
     }
     .notification-badge svg {
       flex-shrink: 0;
     }
-    .expires {
-      font-size: 11px;
-      color: #999;
-      text-align: center;
-      margin-top: 12px;
-    }
     .hidden {
-      display: none;
+      display: none !important;
+    }
+    .expires {
+      font-size: 12px;
+      color: #71717a;
+      text-align: center;
+      padding: 8px 24px 0;
+    }
+    .error-msg {
+      background: #7f1d1d;
+      color: #fecaca;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin: 0 24px 16px;
+      font-size: 13px;
     }
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="card">
     <div class="header">
-      <h1>Payment Authorization</h1>
-      <div class="amount" id="amount">$0.00</div>
-      <div class="merchant" id="merchant">Merchant</div>
+      <div class="header-title" id="title">Complete checkout</div>
+      <div class="header-subtitle" id="subtitle">Authorize payment to complete your purchase</div>
     </div>
 
-    <div class="content">
-      <div id="notification-banner" class="notification-badge hidden">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zm.995-14.901a1 1 0 1 0-1.99 0A5.002 5.002 0 0 0 3 6c0 1.098-.5 6-2 7h14c-1.5-1-2-5.902-2-7 0-2.42-1.72-4.44-4.005-4.901z"/>
-        </svg>
-        <span>Push notification sent to your phone!</span>
+    <div class="details">
+      <div class="detail-row">
+        <span class="detail-label">Merchant</span>
+        <span class="detail-value" id="merchant">Loading...</span>
       </div>
+      <div class="detail-row">
+        <span class="detail-label">Items</span>
+        <span class="detail-value" id="items">Loading...</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Amount</span>
+        <span class="detail-value" id="amount">$0.00</span>
+      </div>
+    </div>
 
+    <div id="notification-banner" class="notification-badge hidden">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zm.995-14.901a1 1 0 1 0-1.99 0A5.002 5.002 0 0 0 3 6c0 1.098-.5 6-2 7h14c-1.5-1-2-5.902-2-7 0-2.42-1.72-4.44-4.005-4.901z"/>
+      </svg>
+      <span>Push notification sent to your phone</span>
+    </div>
+
+    <div id="error-banner" class="error-msg hidden"></div>
+
+    <div class="qr-section" id="qr-section">
       <div class="qr-container">
-        <img id="qr-code" src="" alt="Scan to authorize payment" />
-        <div class="qr-label">Scan with WSIM wallet app</div>
+        <img id="qr-code" src="" alt="Scan to authorize" />
       </div>
+      <div class="qr-label">Scan with WSIM wallet app</div>
+    </div>
 
-      <div class="divider"><span>or</span></div>
+    <div class="divider"><span>or</span></div>
 
-      <a id="auth-link" class="auth-link" href="#" target="_blank">
-        Open Authorization Page
+    <div class="code-section">
+      <div class="code-label">Enter code manually</div>
+      <div class="code-value" id="user-code">WSIM-XXXXXX</div>
+    </div>
+
+    <div class="expires" id="expires"></div>
+
+    <div class="actions">
+      <a id="auth-link" class="btn btn-primary" href="#" target="_blank">
+        Open Authorization
       </a>
-
-      <div class="code-section">
-        <div class="code-label">Manual code entry</div>
-        <div class="code-value" id="user-code">WSIM-XXXXXX</div>
-      </div>
-
-      <div class="expires" id="expires">Expires in 15 minutes</div>
     </div>
 
     <div class="status-bar">
@@ -225,48 +288,102 @@
   <script>
     // OpenAI Apps SDK bridge
     const openai = window.openai;
-
-    // Get tool output data
-    let toolOutput = {};
     let pollInterval = null;
+    let deviceCode = null;
 
     async function initialize() {
       try {
-        // Get the structured content from the tool result
-        toolOutput = await openai.getToolOutput();
+        // Try multiple ways to get the tool output
+        let data = null;
 
-        // Update UI with payment details
-        updateUI(toolOutput);
+        if (openai && typeof openai.getToolOutput === 'function') {
+          try {
+            data = await openai.getToolOutput();
+          } catch (e) {
+            console.warn('getToolOutput failed:', e);
+          }
+        }
 
-        // Start polling for status
-        if (toolOutput.device_code) {
-          startPolling(toolOutput.device_code);
+        // Also check if data was passed via URL params (fallback)
+        if (!data) {
+          const params = new URLSearchParams(window.location.search);
+          const encoded = params.get('data');
+          if (encoded) {
+            try {
+              data = JSON.parse(atob(encoded));
+            } catch (e) {
+              console.warn('URL data parse failed:', e);
+            }
+          }
+        }
+
+        // Check for window.TOOL_OUTPUT (another fallback)
+        if (!data && window.TOOL_OUTPUT) {
+          data = window.TOOL_OUTPUT;
+        }
+
+        if (data) {
+          updateUI(data);
+          deviceCode = data.device_code;
+          if (deviceCode) {
+            startPolling(deviceCode);
+          }
+        } else {
+          showError('Unable to load payment details. Please try again.');
         }
       } catch (error) {
-        console.error('Failed to initialize widget:', error);
+        console.error('Widget init error:', error);
+        showError('Failed to initialize: ' + error.message);
       }
     }
 
+    function showError(msg) {
+      const banner = document.getElementById('error-banner');
+      banner.textContent = msg;
+      banner.classList.remove('hidden');
+    }
+
     function updateUI(data) {
-      // Amount and merchant
-      if (data.amount && data.currency) {
-        document.getElementById('amount').textContent =
-          `${data.currency} ${parseFloat(data.amount).toFixed(2)}`;
-      }
-      if (data.merchant_name) {
-        document.getElementById('merchant').textContent = data.merchant_name;
+      // Title based on context
+      if (data.checkout_session_id) {
+        document.getElementById('title').textContent = 'Complete checkout';
+        document.getElementById('subtitle').textContent =
+          'Authorize payment to complete your purchase';
+      } else {
+        document.getElementById('title').textContent = 'Payment Authorization';
+        document.getElementById('subtitle').textContent =
+          'Authorize this payment request';
       }
 
-      // QR code (base64 image)
+      // Merchant
+      const merchant = data.merchant_name || 'SACP Demo Store';
+      document.getElementById('merchant').textContent = merchant;
+
+      // Items/Description
+      const items = data.description || data.items || 'Purchase';
+      document.getElementById('items').textContent = items;
+
+      // Amount
+      if (data.amount !== undefined) {
+        const currency = data.currency || 'CAD';
+        const amount = parseFloat(data.amount).toFixed(2);
+        document.getElementById('amount').textContent = `$${amount} ${currency}`;
+      }
+
+      // QR code
       if (data.qr_code_base64) {
-        document.getElementById('qr-code').src =
-          `data:image/png;base64,${data.qr_code_base64}`;
+        const qrImg = document.getElementById('qr-code');
+        qrImg.src = `data:image/png;base64,${data.qr_code_base64}`;
+        qrImg.onerror = () => {
+          document.getElementById('qr-section').classList.add('hidden');
+        };
+      } else {
+        document.getElementById('qr-section').classList.add('hidden');
       }
 
       // Authorization link
       if (data.authorization_url) {
-        const link = document.getElementById('auth-link');
-        link.href = data.authorization_url;
+        document.getElementById('auth-link').href = data.authorization_url;
       }
 
       // User code
@@ -291,7 +408,6 @@
       const dot = document.getElementById('status-dot');
       const text = document.getElementById('status-text');
 
-      // Remove all status classes
       dot.classList.remove('approved', 'denied', 'expired');
       text.classList.remove('approved', 'denied');
 
@@ -319,36 +435,41 @@
       }
     }
 
-    async function checkStatus(deviceCode) {
+    async function checkStatus(code) {
+      if (!openai || typeof openai.callTool !== 'function') {
+        console.warn('openai.callTool not available');
+        return;
+      }
+
       try {
-        // Call the status tool via OpenAI bridge
         const result = await openai.callTool('device_authorize_status', {
-          device_code: deviceCode
+          device_code: code
         });
 
         if (result && result.structuredContent) {
           const data = result.structuredContent;
           updateStatus(data.status, data.message);
-
-          // If approved, we can update the parent with the token
-          if (data.status === 'approved' && data.access_token) {
-            // Token is available for the AI to use
-            console.log('Authorization approved, token available');
+        } else if (result && result.content) {
+          // Parse from text content as fallback
+          const text = result.content[0]?.text || '';
+          if (text.includes('approved')) {
+            updateStatus('approved', 'Payment authorized!');
+          } else if (text.includes('denied')) {
+            updateStatus('denied', 'Authorization denied');
+          } else if (text.includes('expired')) {
+            updateStatus('expired', 'Authorization expired');
           }
         }
       } catch (error) {
-        console.error('Failed to check status:', error);
+        console.warn('Status check failed:', error);
+        // Don't show error, just keep polling
       }
     }
 
-    function startPolling(deviceCode) {
-      // Poll every 3 seconds
-      pollInterval = setInterval(() => {
-        checkStatus(deviceCode);
-      }, 3000);
-
-      // Also check immediately
-      checkStatus(deviceCode);
+    function startPolling(code) {
+      pollInterval = setInterval(() => checkStatus(code), 4000);
+      // Initial check after short delay
+      setTimeout(() => checkStatus(code), 1000);
     }
 
     function stopPolling() {
@@ -358,7 +479,7 @@
       }
     }
 
-    // Initialize when DOM is ready
+    // Initialize
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', initialize);
     } else {
