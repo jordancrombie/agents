@@ -224,6 +224,50 @@
       margin: 0 24px 16px;
       font-size: 13px;
     }
+    /* Success animation */
+    .success-section {
+      padding: 32px 24px;
+      text-align: center;
+    }
+    .success-checkmark {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 16px;
+    }
+    .success-checkmark .circle {
+      stroke: #22c55e;
+      stroke-width: 3;
+      fill: none;
+      stroke-dasharray: 283;
+      stroke-dashoffset: 283;
+      animation: circle-draw 0.6s ease-out forwards;
+    }
+    .success-checkmark .check {
+      stroke: #22c55e;
+      stroke-width: 4;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-dasharray: 50;
+      stroke-dashoffset: 50;
+      animation: check-draw 0.4s ease-out 0.4s forwards;
+    }
+    @keyframes circle-draw {
+      to { stroke-dashoffset: 0; }
+    }
+    @keyframes check-draw {
+      to { stroke-dashoffset: 0; }
+    }
+    .success-text {
+      font-size: 18px;
+      font-weight: 600;
+      color: #22c55e;
+      margin-bottom: 8px;
+    }
+    .success-subtext {
+      font-size: 14px;
+      color: #a1a1aa;
+    }
   </style>
 </head>
 <body>
@@ -256,6 +300,16 @@
     </div>
 
     <div id="error-banner" class="error-msg hidden"></div>
+
+    <!-- Success animation (shown on approval) -->
+    <div class="success-section hidden" id="success-section">
+      <svg class="success-checkmark" viewBox="0 0 100 100">
+        <circle class="circle" cx="50" cy="50" r="45" />
+        <path class="check" d="M30 50 L45 65 L70 35" />
+      </svg>
+      <div class="success-text">Payment Approved</div>
+      <div class="success-subtext">Your transaction has been authorized</div>
+    </div>
 
     <div class="qr-section hidden" id="qr-section">
       <div class="qr-container">
@@ -459,6 +513,8 @@
           text.classList.add('approved');
           text.textContent = message || 'Payment authorized!';
           stopPolling();
+          // Show success animation, hide QR/code/actions
+          showSuccessState();
           break;
         case 'denied':
           dot.classList.add('denied');
@@ -472,6 +528,18 @@
           stopPolling();
           break;
       }
+    }
+
+    function showSuccessState() {
+      // Hide QR, code, divider, actions, notification, expires
+      document.getElementById('qr-section').classList.add('hidden');
+      document.getElementById('divider').classList.add('hidden');
+      document.getElementById('code-section').classList.add('hidden');
+      document.getElementById('actions').classList.add('hidden');
+      document.getElementById('expires').classList.add('hidden');
+      document.getElementById('notification-banner').classList.add('hidden');
+      // Show success animation
+      document.getElementById('success-section').classList.remove('hidden');
     }
 
     async function checkStatus(code) {
