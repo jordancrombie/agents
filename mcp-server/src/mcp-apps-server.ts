@@ -25,6 +25,95 @@ import * as QRCode from 'qrcode';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// ============================================================================
+// LOGGING UTILITIES
+// ============================================================================
+
+/**
+ * Generate a short request ID for log correlation
+ */
+function generateRequestId(): string {
+  return randomUUID().slice(0, 8);
+}
+
+/**
+ * Structured logger with request ID correlation
+ */
+const log = {
+  info: (requestId: string, message: string, data?: Record<string, unknown>) => {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      level: 'INFO',
+      requestId,
+      message,
+      ...(data && { data }),
+    };
+    console.log(JSON.stringify(logEntry));
+  },
+
+  error: (requestId: string, message: string, error?: unknown, data?: Record<string, unknown>) => {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      level: 'ERROR',
+      requestId,
+      message,
+      error: error instanceof Error ? { message: error.message, stack: error.stack } : String(error),
+      ...(data && { data }),
+    };
+    console.error(JSON.stringify(logEntry));
+  },
+
+  debug: (requestId: string, message: string, data?: Record<string, unknown>) => {
+    if (process.env.DEBUG === 'true') {
+      const logEntry = {
+        timestamp: new Date().toISOString(),
+        level: 'DEBUG',
+        requestId,
+        message,
+        ...(data && { data }),
+      };
+      console.log(JSON.stringify(logEntry));
+    }
+  },
+};
+
+/**
+ * Logged fetch wrapper - logs all external API calls
+ */
+async function loggedFetch(
+  requestId: string,
+  url: string,
+  options?: RequestInit
+): Promise<Response> {
+  const method = options?.method || 'GET';
+  const startTime = Date.now();
+
+  log.info(requestId, `External API call: ${method} ${url}`);
+
+  try {
+    const response = await loggedFetch(requestId,url, options);
+    const duration = Date.now() - startTime;
+
+    log.info(requestId, `External API response`, {
+      url,
+      method,
+      status: response.status,
+      statusText: response.statusText,
+      durationMs: duration,
+    });
+
+    return response;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    log.error(requestId, `External API call failed`, error, {
+      url,
+      method,
+      durationMs: duration,
+    });
+    throw error;
+  }
+}
+
 // Configuration
 const PORT = parseInt(process.env.PORT || '8000', 10);
 const WSIM_BASE_URL = process.env.WSIM_BASE_URL || 'https://wsim.banksim.ca';
@@ -32,7 +121,7 @@ const SSIM_BASE_URL = process.env.SSIM_BASE_URL || 'https://ssim.banksim.ca';
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.19';
+const WIDGET_VERSION = '1.5.20';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -449,6 +538,13 @@ async function handleMcpRequest(
   error?: { code: number; message: string };
 }> {
   const { method, params, id } = request;
+  const requestId = generateRequestId();
+
+  log.info(requestId, `MCP method: ${method}`, {
+    method,
+    id,
+    hasParams: !!params,
+  });
 
   try {
     switch (method) {
@@ -465,7 +561,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.19',
+              version: '1.5.20',
             },
           },
         };
@@ -486,7 +582,15 @@ async function handleMcpRequest(
         const args = (params as { arguments?: Record<string, unknown> })
           ?.arguments || {};
 
+        log.info(requestId, `MCP tools/call: ${toolName}`, {
+          tool: toolName,
+          arguments: args,
+        });
+
         const result = await executeTool(toolName, args);
+
+        log.info(requestId, `MCP tools/call completed: ${toolName}`);
+
         return {
           jsonrpc: '2.0',
           id,
@@ -551,6 +655,7 @@ async function handleMcpRequest(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    log.error(requestId, `MCP method failed: ${method}`, error, { method, id });
     return {
       jsonrpc: '2.0',
       id,
@@ -563,6 +668,51 @@ async function handleMcpRequest(
  * Execute a tool and return the result
  */
 async function executeTool(
+  name: string,
+  args: Record<string, unknown>
+): Promise<{
+  content: Array<{ type: string; text: string }>;
+  structuredContent?: Record<string, unknown>;
+  _meta?: Record<string, unknown>;
+}> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  // Log tool invocation
+  log.info(requestId, `Tool invoked: ${name}`, {
+    tool: name,
+    arguments: args,
+  });
+
+  try {
+    const result = await executeToolInternal(requestId, name, args);
+    const duration = Date.now() - startTime;
+
+    log.info(requestId, `Tool completed: ${name}`, {
+      tool: name,
+      durationMs: duration,
+      success: true,
+    });
+
+    return result;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+
+    log.error(requestId, `Tool failed: ${name}`, error, {
+      tool: name,
+      arguments: args,
+      durationMs: duration,
+    });
+
+    throw error;
+  }
+}
+
+/**
+ * Internal tool execution (called by executeTool wrapper)
+ */
+async function executeToolInternal(
+  requestId: string,
   name: string,
   args: Record<string, unknown>
 ): Promise<{
@@ -583,7 +733,7 @@ async function executeTool(
       if (category) params.set('category', category);
       params.set('limit', limit.toString());
 
-      const response = await fetch(
+      const response = await loggedFetch(requestId,
         `${SSIM_BASE_URL}/api/agent/v1/products?${params.toString()}`
       );
 
@@ -605,7 +755,7 @@ async function executeTool(
     case 'get_product': {
       const productId = args.product_id as string;
 
-      const response = await fetch(
+      const response = await loggedFetch(requestId,
         `${SSIM_BASE_URL}/api/agent/v1/products/${productId}`
       );
 
@@ -632,7 +782,7 @@ async function executeTool(
       const shippingAddress = args.shipping_address as string | undefined;
 
       // Step 1: Create checkout session with items
-      const createResponse = await fetch(`${SSIM_BASE_URL}/api/agent/v1/sessions`, {
+      const createResponse = await loggedFetch(requestId,`${SSIM_BASE_URL}/api/agent/v1/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items }),
@@ -657,7 +807,7 @@ async function executeTool(
         };
       }
 
-      const updateResponse = await fetch(
+      const updateResponse = await loggedFetch(requestId,
         `${SSIM_BASE_URL}/api/agent/v1/sessions/${sessionId}`,
         {
           method: 'PATCH',
@@ -672,7 +822,7 @@ async function executeTool(
       }
 
       // Step 3: Get the updated checkout to know the total
-      const checkoutResponse = await fetch(
+      const checkoutResponse = await loggedFetch(requestId,
         `${SSIM_BASE_URL}/api/agent/v1/sessions/${sessionId}`
       );
 
@@ -700,7 +850,7 @@ async function executeTool(
       const currency = checkout.cart.currency || 'CAD';
 
       // Step 4: Initiate device authorization
-      const deviceAuthResponse = await fetch(
+      const deviceAuthResponse = await loggedFetch(requestId,
         `${WSIM_BASE_URL}/api/agent/v1/oauth/device_authorization`,
         {
           method: 'POST',
@@ -784,7 +934,7 @@ async function executeTool(
     case 'create_checkout': {
       const items = args.items as Array<{ product_id: string; quantity: number }>;
 
-      const response = await fetch(`${SSIM_BASE_URL}/api/agent/v1/sessions`, {
+      const response = await loggedFetch(requestId,`${SSIM_BASE_URL}/api/agent/v1/sessions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -811,7 +961,7 @@ async function executeTool(
     case 'get_checkout': {
       const sessionId = args.session_id as string;
 
-      const response = await fetch(
+      const response = await loggedFetch(requestId,
         `${SSIM_BASE_URL}/api/agent/v1/sessions/${sessionId}`
       );
 
@@ -857,7 +1007,7 @@ async function executeTool(
         };
       }
 
-      const response = await fetch(
+      const response = await loggedFetch(requestId,
         `${SSIM_BASE_URL}/api/agent/v1/sessions/${sessionId}`,
         {
           method: 'PATCH',
@@ -888,7 +1038,7 @@ async function executeTool(
       const sessionId = args.session_id as string;
 
       // First, get the checkout to know the total and buyer info
-      const checkoutResponse = await fetch(
+      const checkoutResponse = await loggedFetch(requestId,
         `${SSIM_BASE_URL}/api/agent/v1/sessions/${sessionId}`
       );
 
@@ -928,7 +1078,7 @@ async function executeTool(
       const buyerEmail = checkout.buyer?.email;
 
       // Call WSIM device authorization endpoint
-      const deviceAuthResponse = await fetch(
+      const deviceAuthResponse = await loggedFetch(requestId,
         `${WSIM_BASE_URL}/api/agent/v1/oauth/device_authorization`,
         {
           method: 'POST',
@@ -1013,7 +1163,7 @@ async function executeTool(
     case 'cancel_checkout': {
       const sessionId = args.session_id as string;
 
-      const response = await fetch(
+      const response = await loggedFetch(requestId,
         `${SSIM_BASE_URL}/api/agent/v1/sessions/${sessionId}`,
         {
           method: 'DELETE',
@@ -1037,7 +1187,7 @@ async function executeTool(
     case 'get_order_status': {
       const orderId = args.order_id as string;
 
-      const response = await fetch(
+      const response = await loggedFetch(requestId,
         `${SSIM_BASE_URL}/api/agent/v1/orders/${orderId}`
       );
 
@@ -1066,7 +1216,7 @@ async function executeTool(
       const buyerEmail = args.buyer_email as string | undefined;
 
       // Call WSIM device authorization endpoint
-      const deviceAuthResponse = await fetch(
+      const deviceAuthResponse = await loggedFetch(requestId,
         `${WSIM_BASE_URL}/api/agent/v1/oauth/device_authorization`,
         {
           method: 'POST',
@@ -1150,7 +1300,7 @@ async function executeTool(
       const deviceCode = args.device_code as string;
 
       // Poll WSIM token endpoint
-      const tokenResponse = await fetch(`${WSIM_BASE_URL}/api/agent/v1/oauth/token`, {
+      const tokenResponse = await loggedFetch(requestId,`${WSIM_BASE_URL}/api/agent/v1/oauth/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -1271,10 +1421,10 @@ function handleSseRequest(res: ServerResponse) {
   res.on('close', () => {
     clearInterval(heartbeat);
     sessions.delete(sessionId);
-    console.log(`Session ${sessionId} closed`);
+    log.info(sessionId.slice(0, 8), `SSE session closed`, { sessionId });
   });
 
-  console.log(`Session ${sessionId} connected`);
+  log.info(sessionId.slice(0, 8), `SSE session connected`, { sessionId });
 }
 
 /**
@@ -1338,7 +1488,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.19',
+      version: '1.5.20',
       timestamp: new Date().toISOString(),
     })
   );
@@ -1360,8 +1510,13 @@ function handleCors(res: ServerResponse) {
 // Create HTTP server
 const httpServer = createServer(async (req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
+  const requestId = generateRequestId();
 
-  console.log(`${req.method} ${url.pathname}`);
+  log.info(requestId, `HTTP request: ${req.method} ${url.pathname}`, {
+    method: req.method,
+    path: url.pathname,
+    query: Object.fromEntries(url.searchParams),
+  });
 
   // CORS preflight
   if (req.method === 'OPTIONS') {
@@ -1394,7 +1549,12 @@ const httpServer = createServer(async (req, res) => {
 
 // Start server
 httpServer.listen(PORT, () => {
-  console.log(`SACP MCP Apps Server running at http://localhost:${PORT}`);
-  console.log(`MCP endpoint: http://localhost:${PORT}/mcp`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
+  log.info('startup', `SACP MCP Apps Server started`, {
+    version: '1.5.20',
+    port: PORT,
+    mcpEndpoint: `http://localhost:${PORT}/mcp`,
+    healthEndpoint: `http://localhost:${PORT}/health`,
+    ssimBaseUrl: SSIM_BASE_URL,
+    wsimBaseUrl: WSIM_BASE_URL,
+  });
 });
