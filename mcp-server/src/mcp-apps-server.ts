@@ -20,6 +20,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import * as QRCode from 'qrcode';
+import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
 
 // ES module __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -91,7 +92,7 @@ async function loggedFetch(
   log.info(requestId, `External API call: ${method} ${url}`);
 
   try {
-    const response = await loggedFetch(requestId,url, options);
+    const response = await fetch(url, options);
     const duration = Date.now() - startTime;
 
     log.info(requestId, `External API response`, {
@@ -119,9 +120,91 @@ const PORT = parseInt(process.env.PORT || '8000', 10);
 const WSIM_BASE_URL = process.env.WSIM_BASE_URL || 'https://wsim.banksim.ca';
 const SSIM_BASE_URL = process.env.SSIM_BASE_URL || 'https://ssim.banksim.ca';
 
+// ============================================================================
+// JWT/OAUTH CONFIGURATION
+// ============================================================================
+
+// JWKS endpoint for token verification (WSIM Phase 1)
+const WSIM_JWKS_URL = `${WSIM_BASE_URL}/.well-known/jwks.json`;
+
+// Expected token claims
+const EXPECTED_ISSUER = WSIM_BASE_URL;
+const EXPECTED_AUDIENCE = 'chatgpt-mcp'; // OAuth client_id registered with WSIM
+
+// Create JWKS client with caching (jose handles refresh automatically)
+const jwks = createRemoteJWKSet(new URL(WSIM_JWKS_URL));
+
+/**
+ * Validated token payload with required claims
+ */
+interface AuthContext {
+  userId: string;      // sub claim - WalletUser ID
+  clientId: string;    // aud claim - OAuth client_id
+  scope: string;       // scope claim - space-separated permissions
+  expiresAt: Date;     // exp claim
+}
+
+/**
+ * Validate a JWT Bearer token from WSIM
+ * Returns AuthContext if valid, null if invalid/expired
+ */
+async function validateBearerToken(
+  requestId: string,
+  token: string
+): Promise<AuthContext | null> {
+  try {
+    log.debug(requestId, 'Validating Bearer token');
+
+    const { payload } = await jwtVerify(token, jwks, {
+      issuer: EXPECTED_ISSUER,
+      audience: EXPECTED_AUDIENCE,
+    });
+
+    // Extract required claims
+    const sub = payload.sub;
+    const aud = payload.aud;
+    const scope = (payload as JWTPayload & { scope?: string }).scope;
+    const exp = payload.exp;
+
+    if (!sub || !aud || !exp) {
+      log.debug(requestId, 'Token missing required claims', { sub: !!sub, aud: !!aud, exp: !!exp });
+      return null;
+    }
+
+    const authContext: AuthContext = {
+      userId: sub,
+      clientId: Array.isArray(aud) ? aud[0] : aud,
+      scope: scope || '',
+      expiresAt: new Date(exp * 1000),
+    };
+
+    log.info(requestId, 'Token validated successfully', {
+      userId: authContext.userId,
+      clientId: authContext.clientId,
+      scope: authContext.scope,
+    });
+
+    return authContext;
+  } catch (error) {
+    log.debug(requestId, 'Token validation failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+/**
+ * Extract Bearer token from Authorization header
+ */
+function extractBearerToken(authHeader: string | undefined): string | null {
+  if (!authHeader) return null;
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1] : null;
+}
+
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.20';
+const WIDGET_VERSION = '1.5.22';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -530,7 +613,8 @@ async function handleMcpRequest(
     method: string;
     params?: Record<string, unknown>;
   },
-  _sessionId: string
+  _sessionId: string,
+  authHeader?: string
 ): Promise<{
   jsonrpc: string;
   id?: string | number;
@@ -544,7 +628,15 @@ async function handleMcpRequest(
     method,
     id,
     hasParams: !!params,
+    hasAuth: !!authHeader,
   });
+
+  // Validate Bearer token if present (ChatGPT OAuth flow)
+  let authContext: AuthContext | null = null;
+  const bearerToken = extractBearerToken(authHeader);
+  if (bearerToken) {
+    authContext = await validateBearerToken(requestId, bearerToken);
+  }
 
   try {
     switch (method) {
@@ -561,7 +653,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.20',
+              version: '1.5.22',
             },
           },
         };
@@ -585,9 +677,10 @@ async function handleMcpRequest(
         log.info(requestId, `MCP tools/call: ${toolName}`, {
           tool: toolName,
           arguments: args,
+          authenticated: !!authContext,
         });
 
-        const result = await executeTool(toolName, args);
+        const result = await executeTool(toolName, args, authContext);
 
         log.info(requestId, `MCP tools/call completed: ${toolName}`);
 
@@ -669,7 +762,8 @@ async function handleMcpRequest(
  */
 async function executeTool(
   name: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  authContext: AuthContext | null
 ): Promise<{
   content: Array<{ type: string; text: string }>;
   structuredContent?: Record<string, unknown>;
@@ -682,10 +776,12 @@ async function executeTool(
   log.info(requestId, `Tool invoked: ${name}`, {
     tool: name,
     arguments: args,
+    authenticated: !!authContext,
+    userId: authContext?.userId,
   });
 
   try {
-    const result = await executeToolInternal(requestId, name, args);
+    const result = await executeToolInternal(requestId, name, args, authContext);
     const duration = Date.now() - startTime;
 
     log.info(requestId, `Tool completed: ${name}`, {
@@ -714,7 +810,8 @@ async function executeTool(
 async function executeToolInternal(
   requestId: string,
   name: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  authContext: AuthContext | null
 ): Promise<{
   content: Array<{ type: string; text: string }>;
   structuredContent?: Record<string, unknown>;
@@ -781,8 +878,37 @@ async function executeToolInternal(
       const buyerEmail = args.buyer_email as string;
       const shippingAddress = args.shipping_address as string | undefined;
 
+      // ========================================================================
+      // OAUTH FLOW: If no auth context, return auth challenge for ChatGPT
+      // ChatGPT will handle OAuth and retry with Bearer token
+      // ========================================================================
+      if (!authContext) {
+        log.info(requestId, 'No auth context - returning OAuth challenge');
+        return {
+          content: [{
+            type: 'text',
+            text: 'Authorization required. Please authorize to complete this payment.',
+          }],
+          _meta: {
+            'mcp/www_authenticate': {
+              resource: WSIM_BASE_URL,
+              scope: 'purchase',
+            },
+          },
+        };
+      }
+
+      // ========================================================================
+      // AUTHENTICATED FLOW: User has valid OAuth token
+      // Process payment directly without device authorization
+      // ========================================================================
+      log.info(requestId, 'Processing authenticated checkout', {
+        userId: authContext.userId,
+        scope: authContext.scope,
+      });
+
       // Step 1: Create checkout session with items
-      const createResponse = await loggedFetch(requestId,`${SSIM_BASE_URL}/api/agent/v1/sessions`, {
+      const createResponse = await loggedFetch(requestId, `${SSIM_BASE_URL}/api/agent/v1/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items }),
@@ -796,9 +922,13 @@ async function executeToolInternal(
       const session = await createResponse.json() as { session_id: string };
       const sessionId = session.session_id;
 
-      // Step 2: Update with buyer info
+      // Step 2: Update with buyer info (use authenticated user ID)
       const updateData: Record<string, unknown> = {
-        buyer: { name: buyerName, email: buyerEmail },
+        buyer: {
+          name: buyerName,
+          email: buyerEmail,
+          wallet_user_id: authContext.userId, // Link to authenticated user
+        },
       };
       if (shippingAddress) {
         updateData.fulfillment = {
@@ -849,83 +979,50 @@ async function executeToolInternal(
       const amount = checkout.cart.total;
       const currency = checkout.cart.currency || 'CAD';
 
-      // Step 4: Initiate device authorization
-      const deviceAuthResponse = await loggedFetch(requestId,
-        `${WSIM_BASE_URL}/api/agent/v1/oauth/device_authorization`,
+      // Step 4: Complete payment (OAuth token is proof of authorization)
+      // Token already validated - user authorized via ChatGPT OAuth consent screen
+      const completeResponse = await loggedFetch(requestId,
+        `${SSIM_BASE_URL}/api/agent/v1/sessions/${sessionId}/complete`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            agent_name: merchantName,
-            agent_description: itemNames,
-            scope: 'browse cart purchase',
-            response_type: 'token',
-            spending_limits: {
-              per_transaction: amount.toString(),
-              currency,
-            },
-            buyer_email: buyerEmail,
-            checkout_session_id: sessionId,
+            payment_method: 'oauth_authorized',
+            wallet_user_id: authContext.userId,
           }),
         }
       );
 
-      if (!deviceAuthResponse.ok) {
-        const errorText = await deviceAuthResponse.text();
-        throw new Error(`Device authorization failed: ${deviceAuthResponse.status} ${errorText}`);
+      if (!completeResponse.ok) {
+        const errorText = await completeResponse.text();
+        throw new Error(`Failed to complete checkout: ${completeResponse.status} ${errorText}`);
       }
 
-      const deviceAuth = (await deviceAuthResponse.json()) as {
-        device_code: string;
-        user_code: string;
-        verification_uri: string;
-        verification_uri_complete?: string;
-        expires_in: number;
-        notification_sent?: boolean;
-      };
+      const order = await completeResponse.json() as { order_id: string };
 
-      // Build the authorization URL
-      const authorizationUrl =
-        deviceAuth.verification_uri_complete ||
-        `${deviceAuth.verification_uri}?code=${deviceAuth.user_code}`;
-
-      // Step 5: Generate QR code
-      const qrCodeBase64 = await generateQRCodeBase64(authorizationUrl);
-
-      // Build payment data for widget
-      const notificationSent = deviceAuth.notification_sent === true;
-      const paymentData = {
-        checkout_session_id: sessionId,
+      log.info(requestId, 'Checkout completed via OAuth', {
+        sessionId,
+        orderId: order.order_id,
         amount,
         currency,
-        merchant_name: merchantName,
-        description: itemNames,
-        authorization_url: authorizationUrl,
-        user_code: deviceAuth.user_code,
-        device_code: deviceAuth.device_code,
-        verification_uri: deviceAuth.verification_uri,
-        qr_code_base64: qrCodeBase64,
-        notification_sent: notificationSent,
-        expires_in: deviceAuth.expires_in,
-      };
+        userId: authContext.userId,
+      });
 
-      // Build human-readable text fallback
-      let textContent = `Payment Authorization\n`;
-      textContent += `=====================\n\n`;
-      textContent += `Amount: ${currency} ${amount.toFixed(2)}\n`;
-      textContent += `Merchant: ${merchantName}\n`;
-      textContent += `Items: ${itemNames}\n\n`;
-      textContent += `Authorize at: ${authorizationUrl}\n`;
-      textContent += `Code: ${deviceAuth.user_code}\n`;
-      textContent += `Expires in: ${Math.floor(deviceAuth.expires_in / 60)} minutes`;
-
-      // Return with widget data
+      // Return success message (no widget needed for OAuth flow)
       return {
-        content: [{ type: 'text', text: textContent }],
-        structuredContent: { ...paymentData },
-        _meta: {
-          'openai/outputTemplate': WIDGET_URI,
-          ...paymentData,
+        content: [{
+          type: 'text',
+          text: `Payment authorized and processed!\n\nOrder ID: ${order.order_id}\nAmount: ${currency} ${amount.toFixed(2)}\nItems: ${itemNames}\nMerchant: ${merchantName}\n\nThank you for your purchase!`,
+        }],
+        structuredContent: {
+          order_id: order.order_id,
+          session_id: sessionId,
+          amount,
+          currency,
+          merchant_name: merchantName,
+          items: itemNames,
+          status: 'completed',
+          payment_method: 'oauth_authorized',
         },
       };
     }
@@ -1462,8 +1559,9 @@ async function handlePostMessage(
     return;
   }
 
-  // Handle the MCP request
-  const result = await handleMcpRequest(request, sessionId);
+  // Handle the MCP request (pass Authorization header for OAuth)
+  const authHeader = req.headers.authorization;
+  const result = await handleMcpRequest(request, sessionId, authHeader);
 
   // Send response via SSE
   const session = sessions.get(sessionId);
@@ -1488,7 +1586,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.20',
+      version: '1.5.22',
       timestamp: new Date().toISOString(),
     })
   );
@@ -1501,7 +1599,7 @@ function handleCors(res: ServerResponse) {
   res.writeHead(200, {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-Session-Id',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Session-Id, Authorization',
     'Access-Control-Max-Age': '86400',
   });
   res.end();
@@ -1550,7 +1648,7 @@ const httpServer = createServer(async (req, res) => {
 // Start server
 httpServer.listen(PORT, () => {
   log.info('startup', `SACP MCP Apps Server started`, {
-    version: '1.5.20',
+    version: '1.5.22',
     port: PORT,
     mcpEndpoint: `http://localhost:${PORT}/mcp`,
     healthEndpoint: `http://localhost:${PORT}/health`,
