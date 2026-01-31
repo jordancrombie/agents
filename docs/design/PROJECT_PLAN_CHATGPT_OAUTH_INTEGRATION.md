@@ -2,7 +2,7 @@
 
 **Owner**: WSIM Team (Wallet)
 **Date**: 2026-01-30
-**Status**: Planning
+**Status**: ✅ Phase 2 Complete - Ready for Phase 3 Testing
 **Related**: [MCP-UI Embedded OAuth with Passkeys](./MCP_UI_EMBEDDED_OAUTH_WITH_PASSKEYS.md)
 
 ---
@@ -74,45 +74,163 @@ WSIM is the **wallet** and **orchestrator**:
 
 ## Implementation Phases
 
-### Phase 1: WSIM OAuth Foundation
+### Phase 1: WSIM OAuth Foundation ✅ COMPLETE
 
 **Owner**: WSIM Team
-**Dependency**: None (can start immediately)
+**Dependency**: None
 **Deliverable**: Standards-compliant OAuth server that ChatGPT can use
+**Deployed**: v1.2.18 (2026-01-31)
 
-| # | Task | Description | Effort |
+| # | Task | Description | Status |
 |---|------|-------------|--------|
-| 1.1 | Add `/.well-known/oauth-protected-resource` | RFC 9728 discovery endpoint for protected resources | Small |
-| 1.2 | Add `/.well-known/jwks.json` | RSA public keys for JWT verification (RFC 7517) | Small |
-| 1.3 | Verify `/.well-known/oauth-authorization-server` | Ensure all required fields present | Small |
-| 1.4 | Register ChatGPT OAuth client | Public client with PKCE, correct redirect URIs | Small |
-| 1.5 | Verify passkey auth on `/oauth/authorize` | Confirm existing passkey flow works | Small |
-| 1.6 | Token claims for Gateway | Ensure tokens include `sub`, `scope`, `aud`, `exp`, `iss` | Medium |
-| 1.7 | (Optional) Token introspection endpoint | `POST /oauth/introspect` for Gateway validation | Medium |
+| 1.1 | Add `/.well-known/oauth-protected-resource` | RFC 9728 discovery endpoint | ✅ Deployed |
+| 1.2 | Add `/.well-known/jwks.json` | RSA public keys for JWT verification (RFC 7517) | ✅ Deployed |
+| 1.3 | Verify `/.well-known/oauth-authorization-server` | Added `jwks_uri` field | ✅ Deployed |
+| 1.4 | Register ChatGPT OAuth client | `chatgpt-mcp` - public client with PKCE | ✅ Deployed |
+| 1.5 | Verify passkey auth on `/oauth/authorize` | Existing flow works | ✅ Verified |
+| 1.6 | Token claims for Gateway | RS256 signing, includes `sub`, `scope`, `aud`, `exp`, `iss`, `iat` | ✅ Deployed |
+| 1.7 | Token introspection endpoint | Already exists at `/api/agent/v1/oauth/introspect` | ✅ Exists |
 
 **Acceptance Criteria**:
-- [ ] `GET /.well-known/oauth-protected-resource` returns valid JSON
-- [ ] `GET /.well-known/jwks.json` returns valid JWKS with RSA public keys
-- [ ] ChatGPT can complete OAuth flow manually (test with curl/Postman)
-- [ ] Tokens are valid JWTs with correct claims (`sub`, `scope`, `aud`, `exp`, `iss`)
-- [ ] Passkey auth works on authorize page
-- [ ] Agents team can verify tokens locally with JWKS
+- [x] `GET /.well-known/oauth-protected-resource` returns valid JSON
+- [x] `GET /.well-known/jwks.json` returns valid JWKS with RSA public keys
+- [x] Tokens are valid JWTs with correct claims (`sub`, `scope`, `aud`, `exp`, `iss`)
+- [x] Tokens signed with RS256 (verifiable via JWKS)
+- [ ] ChatGPT can complete OAuth flow (requires Phase 2 + 3)
+- [ ] Passkey auth works on authorize page (manual test pending)
 
 ---
 
-### Phase 2: Agents/MCP Integration
+### Phase 2: Agents/MCP Integration ✅ COMPLETE
 
-**Owner**: Agents Team (we can assist)
-**Dependency**: Phase 1 complete
+**Owner**: Agents Team
+**Dependency**: ✅ Phase 1 complete
 **Deliverable**: MCP server returns auth challenges and accepts Bearer tokens
+**Deployed**: v1.5.24 (2026-01-31)
 
-| # | Task | Description | Effort |
+| # | Task | Description | Status |
 |---|------|-------------|--------|
-| 2.1 | Return `_meta["mcp/www_authenticate"]` | When checkout tool called without valid token | Medium |
-| 2.2 | Accept `Authorization: Bearer` header | Parse token from incoming MCP requests | Small |
-| 2.3 | Validate Bearer tokens | Call WSIM introspection or verify JWT locally | Medium |
-| 2.4 | Extract user identity from token | Get `sub` (user ID) for payment processing | Small |
-| 2.5 | Update checkout tool flow | Integrate OAuth into existing payment flow | Medium |
+| 2.1 | Fetch and cache JWKS | Load RSA public keys from `https://wsim.banksim.ca/.well-known/jwks.json` | ✅ Deployed |
+| 2.2 | Accept `Authorization: Bearer` header | Parse token from incoming MCP requests | ✅ Deployed |
+| 2.3 | Validate Bearer tokens locally | Verify RS256 signature using JWKS, check `iss`, `aud`, `exp` | ✅ Deployed |
+| 2.4 | Extract user identity from token | Get `sub` (WalletUser ID) for payment processing | ✅ Deployed |
+| 2.5 | Return `_meta["mcp/www_authenticate"]` | When checkout called without valid token | ✅ Deployed |
+| 2.6 | Update checkout tool flow | If valid token → skip device auth → process payment directly | ✅ Deployed |
+
+**Implementation Notes**:
+- JWT validation using `jose` library with remote JWKS
+- Hybrid response: OAuth challenge (`_meta`) + device auth fallback (`structuredContent`)
+- QR code flow continues to work as fallback when OAuth not supported
+
+---
+
+## 🚀 Agents Team: Getting Started
+
+### Prerequisites (All Deployed)
+
+| Resource | URL | Notes |
+|----------|-----|-------|
+| JWKS Endpoint | `https://wsim.banksim.ca/.well-known/jwks.json` | RSA public keys for token verification |
+| OAuth Metadata | `https://wsim.banksim.ca/.well-known/oauth-authorization-server` | Server capabilities |
+| Protected Resource | `https://wsim.banksim.ca/.well-known/oauth-protected-resource` | MCP discovery |
+
+### Token Validation Checklist
+
+When you receive a Bearer token, validate:
+
+1. **Signature**: Verify RS256 signature using public key from JWKS
+2. **Issuer**: `iss` must equal `https://wsim.banksim.ca`
+3. **Audience**: `aud` must equal `chatgpt-mcp`
+4. **Expiration**: `exp` must be in the future
+5. **Scope**: `scope` should include `purchase` for payment operations
+
+### Example Token Payload
+
+```json
+{
+  "sub": "clm1abc123def456ghi789",  // WalletUser ID - use for payment
+  "client_id": "oauth_chatgpt-mcp_clm1abc1",
+  "owner_id": "clm1abc123def456ghi789",
+  "permissions": ["purchase"],
+  "scope": "purchase",
+  "aud": "chatgpt-mcp",
+  "iat": 1706647500,
+  "exp": 1706648400,
+  "iss": "https://wsim.banksim.ca"
+}
+```
+
+### Payment Flow with OAuth
+
+```
+User: "Buy this item for $25"
+    ↓
+MCP Server receives checkout tool call
+    ↓
+Check for Authorization: Bearer <token>
+    ↓
+┌─ No token or invalid token ──────────────────────────────────┐
+│  Return:                                                      │
+│  {                                                           │
+│    content: [{ type: 'text', text: 'Authorize payment...' }],│
+│    _meta: {                                                  │
+│      'mcp/www_authenticate': {                               │
+│        resource: 'https://wsim.banksim.ca',                  │
+│        scope: 'purchase'                                     │
+│      }                                                       │
+│    }                                                         │
+│  }                                                           │
+│  → ChatGPT handles OAuth popup → User authenticates with     │
+│    passkey → Token returned → ChatGPT retries with token     │
+└──────────────────────────────────────────────────────────────┘
+    ↓
+┌─ Valid token ────────────────────────────────────────────────┐
+│  1. Extract user_id from token.sub                           │
+│  2. Skip device authorization (no QR code needed)            │
+│  3. Process payment directly with SSIM using user_id         │
+│  4. Return success response                                  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Sample JWT Validation Code (TypeScript)
+
+```typescript
+import * as jose from 'jose';
+
+// Cache JWKS at startup
+let jwks: jose.JWTVerifyGetKey;
+
+async function initJWKS() {
+  jwks = jose.createRemoteJWKSet(
+    new URL('https://wsim.banksim.ca/.well-known/jwks.json')
+  );
+}
+
+async function validateToken(token: string): Promise<{
+  valid: boolean;
+  userId?: string;
+  error?: string;
+}> {
+  try {
+    const { payload } = await jose.jwtVerify(token, jwks, {
+      issuer: 'https://wsim.banksim.ca',
+      audience: 'chatgpt-mcp',
+    });
+
+    return {
+      valid: true,
+      userId: payload.sub as string,
+    };
+  } catch (error) {
+    return {
+      valid: false,
+      error: error instanceof Error ? error.message : 'Token validation failed',
+    };
+  }
+}
+```
+
+---
 
 **Key Code Changes** (in `../agents`):
 
@@ -253,9 +371,11 @@ Future: Phase 4 (Agent Permissions)
 
 | Dependency | Owner | Status | Notes |
 |------------|-------|--------|-------|
-| WSIM OAuth infrastructure | WSIM | ✅ Exists | Used by ChatGPT Connectors |
+| WSIM OAuth infrastructure | WSIM | ✅ Deployed | Used by ChatGPT Connectors |
 | Passkey auth on authorize page | WSIM | ✅ Exists | Works today |
-| Token validation | WSIM | 🔶 Needs work | Add introspection or ensure JWT verification |
+| JWKS endpoint | WSIM | ✅ Deployed | `/.well-known/jwks.json` - v1.2.18 |
+| RS256 token signing | WSIM | ✅ Deployed | Tokens verifiable via JWKS |
+| `chatgpt-mcp` client | WSIM | ✅ Deployed | Public client with PKCE |
 
 ### Potential Blockers
 
@@ -344,16 +464,16 @@ Future: Phase 4 (Agent Permissions)
 
 ## Appendix: Existing Infrastructure
 
-### WSIM OAuth Endpoints (Already Exist)
+### WSIM OAuth Endpoints
 
 | Endpoint | Status | Notes |
 |----------|--------|-------|
-| `GET /oauth/authorize` | ✅ | Consent page with passkey auth |
-| `POST /oauth/token` | ✅ | Token exchange |
-| `GET /.well-known/oauth-authorization-server` | ✅ | Server metadata |
-| `GET /.well-known/oauth-protected-resource` | ❌ NEW | Protected resource metadata (RFC 9728) |
-| `GET /.well-known/jwks.json` | ❌ NEW | JWT public keys for local verification (RFC 7517) |
-| `POST /oauth/introspect` | ❌ Optional | Token introspection (not needed if using JWKS) |
+| `GET /api/agent/v1/oauth/authorize` | ✅ | Consent page with passkey auth |
+| `POST /api/agent/v1/oauth/token` | ✅ | Token exchange (PKCE supported) |
+| `GET /.well-known/oauth-authorization-server` | ✅ | Server metadata (includes `jwks_uri`) |
+| `GET /.well-known/oauth-protected-resource` | ✅ **NEW** | Protected resource metadata (RFC 9728) |
+| `GET /.well-known/jwks.json` | ✅ **NEW** | RSA public keys for JWT verification (RFC 7517) |
+| `POST /api/agent/v1/oauth/introspect` | ✅ | Token introspection (optional - prefer JWKS) |
 
 ### WSIM Agent Infrastructure (Already Exists)
 
@@ -379,8 +499,8 @@ Future: Phase 4 (Agent Permissions)
 
 | Team | Reviewer | Status | Date | Notes |
 |------|----------|--------|------|-------|
-| **WSIM** | | ⬜ Pending | | Plan owner |
-| **Agents/MCP** | Claude (AI) | ✅ Aligned | 2026-01-30 | See responses above; ready to implement Phase 2 |
+| **WSIM** | | ✅ Phase 1 Complete | 2026-01-31 | v1.2.18 deployed; JWKS, RS256 tokens, chatgpt-mcp client |
+| **Agents/MCP** | Claude (AI) | ✅ Phase 2 Complete | 2026-01-31 | v1.5.24 deployed; JWT validation, OAuth challenge, device auth fallback |
 | **mwsim** | | ⬜ Pending | | Fallback flows continue to work |
 
 ---
@@ -429,13 +549,13 @@ case 'checkout': {
 }
 ```
 
-### Dependencies on WSIM
+### Dependencies on WSIM ✅ ALL RESOLVED
 
-Before we can implement Phase 2, we need from WSIM:
+All WSIM dependencies are now deployed (v1.2.18):
 
-1. **JWKS endpoint**: `/.well-known/jwks.json` with public keys for JWT verification
-2. **Token claims**: Confirm tokens include `sub` (user ID), `scope`, `aud`, `exp`
-3. **Scope semantics**: What does `purchase` scope authorize? Single payment or multiple?
+1. **JWKS endpoint**: ✅ `https://wsim.banksim.ca/.well-known/jwks.json`
+2. **Token claims**: ✅ RS256 tokens include `sub`, `scope`, `aud`, `exp`, `iss`, `iat`
+3. **Scope semantics**: ✅ `purchase` scope allows multiple payments within token lifetime (1 hour)
 
 ### Questions for WSIM
 
@@ -496,7 +616,7 @@ Before we can implement Phase 2, we need from WSIM:
 3. **Payment flow**: Valid token → extract `sub` (WalletUser ID) → process with SSIM directly
 4. **No WSIM call**: Token is proof of authentication; OAuth consent screen captures user intent
 
-**Implementation ready to begin** once WSIM completes Phase 1 (JWKS endpoint + token claims)
+**✅ Phase 2 Implementation Complete** - Agents v1.5.24 deployed with full OAuth support. Ready for Phase 3 testing with ChatGPT.
 
 ---
 
@@ -508,3 +628,6 @@ Before we can implement Phase 2, we need from WSIM:
 | 2026-01-30 | 1.1 | Added Agents team responses and sign-off |
 | 2026-01-30 | 1.2 | WSIM answers to Agents questions: `sub` = WalletUser ID, validate `aud`, added JWKS requirement |
 | 2026-01-30 | 1.3 | Agents team confirmed alignment with Option A (local JWT validation, direct SSIM payment) |
+| 2026-01-31 | 1.4 | **Phase 1 Complete**: WSIM v1.2.18 deployed with JWKS, oauth-protected-resource, RS256 tokens, chatgpt-mcp client |
+| 2026-01-31 | 1.5 | Added detailed Phase 2 implementation guide for Agents team (JWT validation code, flow diagrams) |
+| 2026-01-31 | 1.6 | **Phase 2 Complete**: Agents v1.5.24 deployed with JWT validation, Bearer token support, OAuth challenge + device auth fallback |
