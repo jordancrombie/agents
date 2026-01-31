@@ -142,6 +142,148 @@ interface AuthContext {
   clientId: string;    // aud claim - OAuth client_id
   scope: string;       // scope claim - space-separated permissions
   expiresAt: Date;     // exp claim
+  agentId?: string;    // agent_id claim - Agent record ID (for step-up flows)
+}
+
+/**
+ * User's spending limits for an agent delegation
+ */
+interface AgentLimits {
+  perTransaction: number;
+  daily: number;
+  monthly: number;
+  currency: string;
+  dailySpent: number;   // Amount already spent today
+  monthlySpent: number; // Amount already spent this month
+}
+
+/**
+ * Limit cache entry with TTL
+ */
+interface LimitsCacheEntry {
+  limits: AgentLimits;
+  expiresAt: number; // Unix timestamp
+}
+
+// Limit cache: 5-minute TTL per design doc
+const LIMITS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const limitsCache = new Map<string, LimitsCacheEntry>();
+
+/**
+ * Get agent limits from WSIM (with caching)
+ * Cache key: {userId}:{agentId}
+ */
+async function getAgentLimits(
+  requestId: string,
+  userId: string,
+  agentId: string | undefined
+): Promise<AgentLimits | null> {
+  // If no agentId, we can't look up limits
+  if (!agentId) {
+    log.debug(requestId, 'No agentId in token, cannot check limits');
+    return null;
+  }
+
+  const cacheKey = `${userId}:${agentId}`;
+  const cached = limitsCache.get(cacheKey);
+
+  // Return cached limits if still valid
+  if (cached && cached.expiresAt > Date.now()) {
+    log.debug(requestId, 'Using cached limits', { cacheKey });
+    return cached.limits;
+  }
+
+  // Fetch from WSIM
+  try {
+    log.debug(requestId, 'Fetching limits from WSIM', { userId, agentId });
+
+    const response = await fetch(
+      `${WSIM_BASE_URL}/api/agent/v1/agents/${agentId}/limits`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          // We pass userId in header for WSIM to verify the agent belongs to this user
+          'X-User-Id': userId,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      log.info(requestId, 'Failed to fetch limits from WSIM', {
+        status: response.status,
+        agentId,
+      });
+      return null;
+    }
+
+    const data = await response.json() as {
+      per_transaction: string;
+      daily: string;
+      monthly: string;
+      currency: string;
+      daily_spent: string;
+      monthly_spent: string;
+    };
+
+    const limits: AgentLimits = {
+      perTransaction: parseFloat(data.per_transaction) || Infinity,
+      daily: parseFloat(data.daily) || Infinity,
+      monthly: parseFloat(data.monthly) || Infinity,
+      currency: data.currency || 'CAD',
+      dailySpent: parseFloat(data.daily_spent) || 0,
+      monthlySpent: parseFloat(data.monthly_spent) || 0,
+    };
+
+    // Cache the result
+    limitsCache.set(cacheKey, {
+      limits,
+      expiresAt: Date.now() + LIMITS_CACHE_TTL_MS,
+    });
+
+    log.info(requestId, 'Cached agent limits', { cacheKey, limits });
+    return limits;
+  } catch (error) {
+    log.error(requestId, 'Error fetching limits from WSIM', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+/**
+ * Check if a purchase amount exceeds the user's limits
+ * Returns the exceeded limit info, or null if within all limits
+ */
+function checkLimitsExceeded(
+  amount: number,
+  limits: AgentLimits
+): { type: 'per_transaction' | 'daily' | 'monthly'; limit: number; requested: number } | null {
+  // Check in priority order: per_transaction > daily > monthly
+  if (amount > limits.perTransaction) {
+    return {
+      type: 'per_transaction',
+      limit: limits.perTransaction,
+      requested: amount,
+    };
+  }
+
+  if (limits.dailySpent + amount > limits.daily) {
+    return {
+      type: 'daily',
+      limit: limits.daily,
+      requested: amount,
+    };
+  }
+
+  if (limits.monthlySpent + amount > limits.monthly) {
+    return {
+      type: 'monthly',
+      limit: limits.monthly,
+      requested: amount,
+    };
+  }
+
+  return null; // Within all limits
 }
 
 /**
@@ -165,6 +307,8 @@ async function validateBearerToken(
     const aud = payload.aud;
     const scope = (payload as JWTPayload & { scope?: string }).scope;
     const exp = payload.exp;
+    // Optional: agent_id for limit lookups and step-up flows
+    const agentId = (payload as JWTPayload & { agent_id?: string }).agent_id;
 
     if (!sub || !aud || !exp) {
       log.debug(requestId, 'Token missing required claims', { sub: !!sub, aud: !!aud, exp: !!exp });
@@ -176,12 +320,14 @@ async function validateBearerToken(
       clientId: Array.isArray(aud) ? aud[0] : aud,
       scope: scope || '',
       expiresAt: new Date(exp * 1000),
+      agentId, // May be undefined if WSIM doesn't include it yet
     };
 
     log.info(requestId, 'Token validated successfully', {
       userId: authContext.userId,
       clientId: authContext.clientId,
       scope: authContext.scope,
+      agentId: authContext.agentId,
     });
 
     return authContext;
@@ -204,7 +350,7 @@ function extractBearerToken(authHeader: string | undefined): string | null {
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.27';
+const WIDGET_VERSION = '1.5.28';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -363,9 +509,12 @@ const tools = [
       destructiveHint: false,
       readOnlyHint: false,
     },
-    // OAuth security scheme for ChatGPT - declares that this tool requires authentication
+    // Mixed auth: Tool works with OR without OAuth token
+    // - noauth: First purchase (triggers device auth flow)
+    // - oauth2: Delegated purchase (auto-approve within limits, step-up if exceeded)
     // Must be an array per OpenAI Apps SDK schema validation
     securitySchemes: [
+      { type: 'noauth' }, // First purchase - no token required
       {
         type: 'oauth2',
         flows: {
@@ -669,7 +818,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.27',
+              version: '1.5.28',
             },
           },
         };
@@ -970,15 +1119,136 @@ async function executeToolInternal(
 
       // ========================================================================
       // OAUTH AUTHENTICATED FLOW: User has valid OAuth token
-      // Process payment directly without device authorization
+      // Check limits before auto-approving. If exceeded, trigger step-up.
       // ========================================================================
       if (authContext) {
         log.info(requestId, 'Processing authenticated checkout (OAuth flow)', {
           userId: authContext.userId,
           scope: authContext.scope,
+          agentId: authContext.agentId,
         });
 
-        // Complete payment (OAuth token is proof of authorization)
+        // Check limits if we have an agentId
+        const limits = await getAgentLimits(requestId, authContext.userId, authContext.agentId);
+        const exceededLimit = limits ? checkLimitsExceeded(amount, limits) : null;
+
+        if (exceededLimit) {
+          // ====================================================================
+          // STEP-UP FLOW: Purchase exceeds user's limits
+          // Trigger device authorization for this specific transaction
+          // ====================================================================
+          log.info(requestId, 'Purchase exceeds limits, triggering step-up', {
+            userId: authContext.userId,
+            agentId: authContext.agentId,
+            amount,
+            exceededLimit,
+          });
+
+          // Call WSIM device authorization with step-up parameters
+          const stepUpResponse = await loggedFetch(requestId,
+            `${WSIM_BASE_URL}/api/agent/v1/oauth/device_authorization`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                agent_name: merchantName,
+                agent_description: itemNames,
+                scope: 'browse cart purchase',
+                response_type: 'token',
+                request_type: 'step_up', // NEW: Step-up flow
+                existing_agent_id: authContext.agentId, // NEW: Link to existing delegation
+                payment_context: { // NEW: Payment details for approval UI
+                  amount: amount.toString(),
+                  currency,
+                  item_description: itemNames,
+                  merchant_name: merchantName,
+                },
+                exceeded_limit: { // NEW: Which limit was exceeded
+                  type: exceededLimit.type,
+                  limit: exceededLimit.limit.toString(),
+                  requested: exceededLimit.requested.toString(),
+                  currency,
+                },
+                buyer_email: buyerEmail,
+                checkout_session_id: sessionId,
+              }),
+            }
+          );
+
+          if (!stepUpResponse.ok) {
+            const errorText = await stepUpResponse.text();
+            throw new Error(`Step-up authorization failed: ${stepUpResponse.status} ${errorText}`);
+          }
+
+          const stepUpAuth = (await stepUpResponse.json()) as {
+            device_code: string;
+            user_code: string;
+            verification_uri: string;
+            verification_uri_complete?: string;
+            expires_in: number;
+            notification_sent?: boolean;
+          };
+
+          // Build the authorization URL
+          const authorizationUrl =
+            stepUpAuth.verification_uri_complete ||
+            `${stepUpAuth.verification_uri}?code=${stepUpAuth.user_code}`;
+
+          // Generate QR code
+          const qrCodeBase64 = await generateQRCodeBase64(authorizationUrl);
+          const notificationSent = stepUpAuth.notification_sent === true;
+
+          log.info(requestId, 'Step-up authorization initiated', {
+            sessionId,
+            deviceCode: stepUpAuth.device_code.slice(0, 8) + '...',
+            notificationSent,
+            exceededLimitType: exceededLimit.type,
+          });
+
+          // Return step-up authorization widget
+          const limitTypeText = exceededLimit.type === 'per_transaction' ? 'per-transaction' :
+                                exceededLimit.type === 'daily' ? 'daily' : 'monthly';
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `This purchase of ${currency} ${amount.toFixed(2)} exceeds your ${limitTypeText} limit of ${currency} ${exceededLimit.limit.toFixed(2)}. ${notificationSent ? 'A notification was sent to your WSIM wallet for approval.' : 'Please approve this one-time purchase.'}`,
+              },
+            ],
+            isError: true,
+            structuredContent: {
+              checkout_session_id: sessionId,
+              amount,
+              currency,
+              merchant_name: merchantName,
+              item_description: itemNames,
+              device_code: stepUpAuth.device_code,
+              user_code: stepUpAuth.user_code,
+              authorization_url: authorizationUrl,
+              qr_code: qrCodeBase64,
+              notification_sent: notificationSent,
+              expires_in: stepUpAuth.expires_in,
+              status: 'step_up_required',
+              exceeded_limit: exceededLimit,
+            },
+            _meta: {
+              'mcp/www_authenticate': [
+                `Bearer resource_metadata="${WSIM_BASE_URL}/.well-known/oauth-protected-resource", error="insufficient_scope", error_description="Purchase exceeds spending limit"`,
+              ],
+            },
+          };
+        }
+
+        // ======================================================================
+        // WITHIN LIMITS: Auto-approve payment
+        // ======================================================================
+        log.info(requestId, 'Purchase within limits, auto-approving', {
+          userId: authContext.userId,
+          amount,
+          limits: limits ? { perTransaction: limits.perTransaction, daily: limits.daily } : 'not checked',
+        });
+
+        // Complete payment (OAuth token + within limits = authorized)
         const completeResponse = await loggedFetch(requestId,
           `${SSIM_BASE_URL}/api/agent/v1/sessions/${sessionId}/complete`,
           {
@@ -998,7 +1268,7 @@ async function executeToolInternal(
 
         const order = await completeResponse.json() as { order_id: string };
 
-        log.info(requestId, 'Checkout completed via OAuth', {
+        log.info(requestId, 'Checkout completed via OAuth (within limits)', {
           sessionId,
           orderId: order.order_id,
           amount,
@@ -1029,9 +1299,9 @@ async function executeToolInternal(
       // DEVICE AUTH FLOW (DEFAULT): No OAuth token, use QR code flow
       // This is the standard flow for unauthenticated users
       // ========================================================================
-      log.info(requestId, 'Processing checkout with device authorization (QR code flow)');
+      log.info(requestId, 'Processing checkout with device authorization (first purchase flow)');
 
-      // Call WSIM device authorization endpoint
+      // Call WSIM device authorization endpoint with first-purchase parameters
       const deviceAuthResponse = await loggedFetch(requestId,
         `${WSIM_BASE_URL}/api/agent/v1/oauth/device_authorization`,
         {
@@ -1044,6 +1314,14 @@ async function executeToolInternal(
             agent_description: itemNames,
             scope: 'browse cart purchase',
             response_type: 'token',
+            request_type: 'first_purchase', // NEW: Distinguish from step-up
+            payment_context: { // NEW: Payment details for approval UI
+              amount: amount.toString(),
+              currency,
+              item_description: itemNames,
+              merchant_name: merchantName,
+            },
+            show_delegation_option: true, // NEW: Show "Allow future purchases" checkbox
             spending_limits: {
               per_transaction: amount.toString(),
               currency,
@@ -1274,7 +1552,7 @@ async function executeToolInternal(
       const currency = checkout.cart.currency || 'CAD';
       const buyerEmail = checkout.buyer?.email;
 
-      // Call WSIM device authorization endpoint
+      // Call WSIM device authorization endpoint with first-purchase parameters
       const deviceAuthResponse = await loggedFetch(requestId,
         `${WSIM_BASE_URL}/api/agent/v1/oauth/device_authorization`,
         {
@@ -1287,6 +1565,14 @@ async function executeToolInternal(
             agent_description: itemNames,
             scope: 'browse cart purchase',
             response_type: 'token',
+            request_type: 'first_purchase', // NEW: Distinguish from step-up
+            payment_context: { // NEW: Payment details for approval UI
+              amount: amount.toString(),
+              currency,
+              item_description: itemNames,
+              merchant_name: merchantName,
+            },
+            show_delegation_option: true, // NEW: Show "Allow future purchases" checkbox
             spending_limits: {
               per_transaction: amount.toString(),
               currency,
@@ -1412,7 +1698,7 @@ async function executeToolInternal(
         (args.description as string) || `Payment to ${merchantName}`;
       const buyerEmail = args.buyer_email as string | undefined;
 
-      // Call WSIM device authorization endpoint
+      // Call WSIM device authorization endpoint with first-purchase parameters
       const deviceAuthResponse = await loggedFetch(requestId,
         `${WSIM_BASE_URL}/api/agent/v1/oauth/device_authorization`,
         {
@@ -1425,6 +1711,14 @@ async function executeToolInternal(
             agent_description: description,
             scope: 'browse cart purchase',
             response_type: 'token',
+            request_type: 'first_purchase', // NEW: Distinguish from step-up
+            payment_context: { // NEW: Payment details for approval UI
+              amount: amount.toString(),
+              currency,
+              item_description: description,
+              merchant_name: merchantName,
+            },
+            show_delegation_option: true, // NEW: Show "Allow future purchases" checkbox
             spending_limits: {
               per_transaction: amount.toString(),
               currency,
@@ -1514,6 +1808,9 @@ async function executeToolInternal(
         access_token?: string;
         token_type?: string;
         expires_in?: number;
+        // NEW: Delegation fields from WSIM
+        delegation_granted?: boolean;
+        delegation_pending?: boolean;
       };
 
       if (tokenResult.error) {
@@ -1558,7 +1855,41 @@ async function executeToolInternal(
         };
       }
 
-      // Success - return the access token
+      // ========================================================================
+      // DELEGATION PENDING: User approved payment AND granted delegation
+      // Trigger OAuth challenge so ChatGPT initiates the OAuth flow
+      // ========================================================================
+      if (tokenResult.delegation_pending) {
+        log.info(requestId, 'Delegation pending - triggering OAuth challenge', {
+          delegationGranted: tokenResult.delegation_granted,
+        });
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Payment complete! To enable automatic payments for future purchases, please link your WSIM Wallet.',
+            },
+          ],
+          isError: true, // Mark as error to trigger OAuth handling
+          structuredContent: {
+            status: 'approved',
+            message: 'Payment authorized successfully!',
+            delegation_granted: tokenResult.delegation_granted,
+            delegation_pending: tokenResult.delegation_pending,
+          },
+          _meta: {
+            // Trigger OAuth challenge - ChatGPT will initiate OAuth flow
+            'mcp/www_authenticate': [
+              `Bearer resource_metadata="${WSIM_BASE_URL}/.well-known/oauth-protected-resource"`,
+            ],
+          },
+        };
+      }
+
+      // ========================================================================
+      // SUCCESS: Payment approved (no delegation or delegation declined)
+      // ========================================================================
       return {
         content: [
           {
@@ -1572,6 +1903,7 @@ async function executeToolInternal(
           token_type: tokenResult.token_type,
           expires_in: tokenResult.expires_in,
           message: 'Payment authorized successfully!',
+          delegation_granted: tokenResult.delegation_granted ?? false,
         },
       };
     }
@@ -1686,7 +2018,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.27',
+      version: '1.5.28',
       timestamp: new Date().toISOString(),
     })
   );
@@ -1785,7 +2117,7 @@ const httpServer = createServer(async (req, res) => {
 // Start server
 httpServer.listen(PORT, () => {
   log.info('startup', `SACP MCP Apps Server started`, {
-    version: '1.5.27',
+    version: '1.5.28',
     port: PORT,
     mcpEndpoint: `http://localhost:${PORT}/mcp`,
     healthEndpoint: `http://localhost:${PORT}/health`,
