@@ -204,7 +204,7 @@ function extractBearerToken(authHeader: string | undefined): string | null {
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.24';
+const WIDGET_VERSION = '1.5.25';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -362,6 +362,21 @@ const tools = [
     annotations: {
       destructiveHint: false,
       readOnlyHint: false,
+    },
+    // OAuth security scheme for ChatGPT - declares that this tool requires authentication
+    securitySchemes: {
+      oauth2: {
+        type: 'oauth2',
+        flows: {
+          authorizationCode: {
+            authorizationUrl: `${WSIM_BASE_URL}/api/agent/v1/oauth/authorize`,
+            tokenUrl: `${WSIM_BASE_URL}/api/agent/v1/oauth/token`,
+            scopes: {
+              purchase: 'Make payments on behalf of the user',
+            },
+          },
+        },
+      },
     },
   },
 
@@ -653,7 +668,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.24',
+              version: '1.5.25',
             },
           },
         };
@@ -768,6 +783,7 @@ async function executeTool(
   content: Array<{ type: string; text: string }>;
   structuredContent?: Record<string, unknown>;
   _meta?: Record<string, unknown>;
+  isError?: boolean;
 }> {
   const requestId = generateRequestId();
   const startTime = Date.now();
@@ -816,6 +832,7 @@ async function executeToolInternal(
   content: Array<{ type: string; text: string }>;
   structuredContent?: Record<string, unknown>;
   _meta?: Record<string, unknown>;
+  isError?: boolean;
 }> {
   switch (name) {
     // === Store Discovery & Browsing ===
@@ -1071,7 +1088,7 @@ async function executeToolInternal(
       });
 
       // Return BOTH:
-      // 1. _meta["mcp/www_authenticate"] - ChatGPT OAuth challenge (Phase 2, Task 2.5)
+      // 1. _meta["mcp/www_authenticate"] - RFC 6750 WWW-Authenticate challenge for ChatGPT OAuth
       // 2. structuredContent - Device auth data for widget fallback (QR code, push notification)
       //
       // If ChatGPT supports MCP OAuth, it will handle the challenge and retry with Bearer token.
@@ -1080,9 +1097,11 @@ async function executeToolInternal(
         content: [
           {
             type: 'text',
-            text: `Payment authorization initiated for ${currency} ${amount.toFixed(2)}. ${notificationSent ? 'A notification was sent to your WSIM wallet.' : 'Scan the QR code or click the authorization link to approve.'}`,
+            text: `Payment authorization required for ${currency} ${amount.toFixed(2)}. ${notificationSent ? 'A notification was sent to your WSIM wallet.' : 'Please authorize to complete this payment.'}`,
           },
         ],
+        // Mark as error so ChatGPT knows to handle the auth challenge
+        isError: true,
         structuredContent: {
           checkout_session_id: sessionId,
           amount,
@@ -1097,13 +1116,12 @@ async function executeToolInternal(
           notification_sent: notificationSent,
           expires_in: deviceAuth.expires_in,
         },
-        // OAuth challenge for ChatGPT (MCP spec pattern)
-        // ChatGPT will see this and can initiate OAuth flow to WSIM
+        // OAuth challenge for ChatGPT - RFC 6750 WWW-Authenticate format (array of strings)
+        // ChatGPT will see this and initiate OAuth flow to WSIM
         _meta: {
-          'mcp/www_authenticate': {
-            resource: WSIM_BASE_URL,
-            scope: 'purchase',
-          },
+          'mcp/www_authenticate': [
+            `Bearer resource_metadata="${WSIM_BASE_URL}/.well-known/oauth-protected-resource", error="insufficient_scope", error_description="Authentication required to complete payment"`,
+          ],
         },
       };
     }
@@ -1667,7 +1685,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.24',
+      version: '1.5.25',
       timestamp: new Date().toISOString(),
     })
   );
@@ -1729,7 +1747,7 @@ const httpServer = createServer(async (req, res) => {
 // Start server
 httpServer.listen(PORT, () => {
   log.info('startup', `SACP MCP Apps Server started`, {
-    version: '1.5.24',
+    version: '1.5.25',
     port: PORT,
     mcpEndpoint: `http://localhost:${PORT}/mcp`,
     healthEndpoint: `http://localhost:${PORT}/health`,
