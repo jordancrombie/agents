@@ -204,7 +204,7 @@ function extractBearerToken(authHeader: string | undefined): string | null {
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.23';
+const WIDGET_VERSION = '1.5.24';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -653,7 +653,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.23',
+              version: '1.5.24',
             },
           },
         };
@@ -1070,7 +1070,12 @@ async function executeToolInternal(
         expiresIn: deviceAuth.expires_in,
       });
 
-      // Return widget data in structuredContent (for two-tool handoff pattern)
+      // Return BOTH:
+      // 1. _meta["mcp/www_authenticate"] - ChatGPT OAuth challenge (Phase 2, Task 2.5)
+      // 2. structuredContent - Device auth data for widget fallback (QR code, push notification)
+      //
+      // If ChatGPT supports MCP OAuth, it will handle the challenge and retry with Bearer token.
+      // Otherwise, the widget displays QR code and polls for device authorization.
       return {
         content: [
           {
@@ -1091,6 +1096,14 @@ async function executeToolInternal(
           qr_code_base64: qrCodeBase64,
           notification_sent: notificationSent,
           expires_in: deviceAuth.expires_in,
+        },
+        // OAuth challenge for ChatGPT (MCP spec pattern)
+        // ChatGPT will see this and can initiate OAuth flow to WSIM
+        _meta: {
+          'mcp/www_authenticate': {
+            resource: WSIM_BASE_URL,
+            scope: 'purchase',
+          },
         },
       };
     }
@@ -1654,7 +1667,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.23',
+      version: '1.5.24',
       timestamp: new Date().toISOString(),
     })
   );
@@ -1716,7 +1729,7 @@ const httpServer = createServer(async (req, res) => {
 // Start server
 httpServer.listen(PORT, () => {
   log.info('startup', `SACP MCP Apps Server started`, {
-    version: '1.5.23',
+    version: '1.5.24',
     port: PORT,
     mcpEndpoint: `http://localhost:${PORT}/mcp`,
     healthEndpoint: `http://localhost:${PORT}/health`,
