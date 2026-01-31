@@ -204,7 +204,7 @@ function extractBearerToken(authHeader: string | undefined): string | null {
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.26';
+const WIDGET_VERSION = '1.5.27';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -669,7 +669,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.26',
+              version: '1.5.27',
             },
           },
         };
@@ -1686,10 +1686,40 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.26',
+      version: '1.5.27',
       timestamp: new Date().toISOString(),
     })
   );
+}
+
+/**
+ * Handle OAuth Protected Resource Metadata (RFC 9728)
+ * This tells OAuth clients (like ChatGPT) where to authenticate users
+ */
+function handleOAuthProtectedResourceMetadata(res: ServerResponse) {
+  const metadata = {
+    // The resource server identifier (this MCP server)
+    resource: 'https://sacp-mcp.banksim.ca',
+
+    // Where to get authorization (WSIM is our auth server)
+    authorization_servers: [WSIM_BASE_URL],
+
+    // Scopes we support
+    scopes_supported: ['purchase', 'browse', 'cart'],
+
+    // How Bearer tokens should be sent
+    bearer_methods_supported: ['header'],
+
+    // Resource documentation (optional but helpful)
+    resource_documentation: 'https://sacp-mcp.banksim.ca/docs',
+  };
+
+  res.writeHead(200, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'max-age=3600', // Cache for 1 hour
+  });
+  res.end(JSON.stringify(metadata, null, 2));
 }
 
 /**
@@ -1728,6 +1758,13 @@ const httpServer = createServer(async (req, res) => {
     return;
   }
 
+  // OAuth Protected Resource Metadata (RFC 9728)
+  // Tells ChatGPT and other OAuth clients where to authenticate
+  if (req.method === 'GET' && url.pathname === '/.well-known/oauth-protected-resource') {
+    handleOAuthProtectedResourceMetadata(res);
+    return;
+  }
+
   // SSE connection
   if (req.method === 'GET' && url.pathname === '/mcp') {
     handleSseRequest(res);
@@ -1748,10 +1785,11 @@ const httpServer = createServer(async (req, res) => {
 // Start server
 httpServer.listen(PORT, () => {
   log.info('startup', `SACP MCP Apps Server started`, {
-    version: '1.5.25',
+    version: '1.5.27',
     port: PORT,
     mcpEndpoint: `http://localhost:${PORT}/mcp`,
     healthEndpoint: `http://localhost:${PORT}/health`,
+    oauthMetadataEndpoint: `http://localhost:${PORT}/.well-known/oauth-protected-resource`,
     ssimBaseUrl: SSIM_BASE_URL,
     wsimBaseUrl: WSIM_BASE_URL,
   });
