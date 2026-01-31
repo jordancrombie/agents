@@ -204,7 +204,7 @@ function extractBearerToken(authHeader: string | undefined): string | null {
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.25';
+const WIDGET_VERSION = '1.5.26';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -364,8 +364,9 @@ const tools = [
       readOnlyHint: false,
     },
     // OAuth security scheme for ChatGPT - declares that this tool requires authentication
-    securitySchemes: {
-      oauth2: {
+    // Must be an array per OpenAI Apps SDK schema validation
+    securitySchemes: [
+      {
         type: 'oauth2',
         flows: {
           authorizationCode: {
@@ -377,7 +378,7 @@ const tools = [
           },
         },
       },
-    },
+    ],
   },
 
   // === Individual Checkout Tools (Advanced Use) ===
@@ -668,7 +669,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.25',
+              version: '1.5.26',
             },
           },
         };
@@ -1685,7 +1686,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.25',
+      version: '1.5.26',
       timestamp: new Date().toISOString(),
     })
   );
