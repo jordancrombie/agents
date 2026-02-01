@@ -101,10 +101,28 @@ app.get('/.well-known/oauth-protected-resource', (req, res) => {
 | Endpoint | Hosted By | Purpose |
 |----------|-----------|---------|
 | `/.well-known/oauth-protected-resource` | **MCP Server** (sacp-mcp.banksim.ca) | Tells ChatGPT "I'm a protected resource, here's my auth server" |
-| `/.well-known/oauth-authorization-server` | WSIM (wsim-auth-dev.banksim.ca) | OAuth server metadata (authorization, token endpoints) |
+| `/.well-known/oauth-authorization-server` | WSIM (wsim-auth-dev.banksim.ca) | OAuth server metadata (authorization, token endpoints, **registration_endpoint**) |
 | `/.well-known/jwks.json` | WSIM (wsim-auth-dev.banksim.ca) | Public keys for token validation |
 
 **Key insight**: "Mixed" auth means "some tools need OAuth" - ChatGPT still validates OAuth exists at setup, but won't prompt users until a protected tool returns an OAuth challenge.
+
+### Connector Configuration (OpenAI Platform)
+
+When configuring the connector in the OpenAI Apps/Connector platform:
+
+1. **Select "Mixed" authentication** (not "OAuth required" or "None")
+2. This tells ChatGPT: "Some tools need auth, some don't"
+
+| Config Option | Behavior |
+|---------------|----------|
+| **None** | No OAuth at all - can't do OAuth challenges later |
+| **OAuth Required** | Prompts user for OAuth at connector setup |
+| **Mixed** ✅ | Validates OAuth exists, but prompt depends on tool `securitySchemes` |
+
+With "Mixed" configured:
+- ChatGPT validates DCR + PKCE exist (at setup)
+- Users are **NOT prompted** for OAuth at setup
+- OAuth only triggers when a tool returns `mcp/www_authenticate` challenge
 
 ### Verification
 
