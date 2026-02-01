@@ -350,7 +350,7 @@ function extractBearerToken(authHeader: string | undefined): string | null {
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.36';
+const WIDGET_VERSION = '1.5.37';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -470,7 +470,7 @@ const tools = [
   {
     name: 'checkout',
     description:
-      'Complete a purchase in one step. Provide items, buyer info, and shipping address. Returns a payment authorization widget with QR code.',
+      'Complete a purchase in one step. Provide items and buyer_name. buyer_email is optional: if provided, WSIM sends a push notification for faster checkout; if omitted, the user enters their email on the WSIM website (more private). Consider asking the user which they prefer. Returns a payment authorization widget with QR code.',
     _meta: {
       'openai/outputTemplate': WIDGET_URI,
       'openai/widgetCSP': WIDGET_CSP,
@@ -499,14 +499,14 @@ const tools = [
         },
         buyer_email: {
           type: 'string',
-          description: 'Buyer email address',
+          description: 'Buyer email address (optional). If provided, enables push notification for faster checkout. If user prefers privacy, omit this - they can enter it directly on WSIM.',
         },
         shipping_address: {
           type: 'string',
           description: 'Shipping address (optional for pickup)',
         },
       },
-      required: ['items', 'buyer_name', 'buyer_email'],
+      required: ['items', 'buyer_name'],
     },
     annotations: {
       destructiveHint: false,
@@ -822,7 +822,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.36',
+              version: '1.5.37',
             },
           },
         };
@@ -1046,7 +1046,7 @@ async function executeToolInternal(
     case 'checkout': {
       const items = args.items as Array<{ product_id: string; quantity: number }>;
       const buyerName = args.buyer_name as string;
-      const buyerEmail = args.buyer_email as string;
+      const buyerEmail = args.buyer_email as string | undefined; // Optional - user's choice for privacy
       const shippingAddress = args.shipping_address as string | undefined;
 
       // Step 1: Create checkout session with items
@@ -1068,7 +1068,7 @@ async function executeToolInternal(
       const updateData: Record<string, unknown> = {
         buyer: {
           name: buyerName,
-          email: buyerEmail,
+          ...(buyerEmail && { email: buyerEmail }), // Only include if user chose to share
           ...(authContext && { wallet_user_id: authContext.userId }), // Link to authenticated user if available
         },
       };
@@ -1173,7 +1173,8 @@ async function executeToolInternal(
                   requested: exceededLimit.requested.toString(),
                   currency,
                 },
-                buyer_email: buyerEmail,
+                // buyer_email only if user chose to share (Two Checkout Flows)
+                ...(buyerEmail && { buyer_email: buyerEmail }),
                 checkout_session_id: sessionId,
               }),
             }
@@ -1330,7 +1331,10 @@ async function executeToolInternal(
               per_transaction: amount.toString(),
               currency,
             },
-            buyer_email: buyerEmail,
+            // Two Checkout Flows: buyer_email only included if user chose to share
+            // Flow A (with email): WSIM sends push immediately
+            // Flow B (without): User enters email on WSIM site (more private)
+            ...(buyerEmail && { buyer_email: buyerEmail }),
             checkout_session_id: sessionId,
           }),
         }
@@ -2000,7 +2004,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.36',
+      version: '1.5.37',
       timestamp: new Date().toISOString(),
     })
   );
@@ -2090,7 +2094,7 @@ const httpServer = createServer(async (req, res) => {
 // Start server
 httpServer.listen(PORT, () => {
   log.info('startup', `SACP MCP Apps Server started`, {
-    version: '1.5.36',
+    version: '1.5.37',
     port: PORT,
     mcpEndpoint: `http://localhost:${PORT}/mcp`,
     healthEndpoint: `http://localhost:${PORT}/health`,

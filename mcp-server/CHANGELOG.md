@@ -5,6 +5,17 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.37] - 2026-02-01
+
+### Added
+- **Two Checkout Flows (User's Choice)**: Privacy-respecting checkout per design doc
+  - `buyer_email` is now **optional** in the `checkout` tool (removed from required array)
+  - Flow A: User shares email → WSIM sends push notification immediately
+  - Flow B: User declines → enters email on WSIM site (more private)
+  - Updated tool description to guide AI to offer users the choice
+  - Updated field description to explain privacy trade-off
+  - WSIM requests now conditionally include `buyer_email` only if provided
+
 ## [1.5.36] - 2026-02-01
 
 ### Added
