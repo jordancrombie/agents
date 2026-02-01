@@ -350,7 +350,7 @@ function extractBearerToken(authHeader: string | undefined): string | null {
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.33';
+const WIDGET_VERSION = '1.5.34';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -804,7 +804,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.33',
+              version: '1.5.34',
             },
           },
         };
@@ -1352,33 +1352,30 @@ async function executeToolInternal(
         expiresIn: deviceAuth.expires_in,
       });
 
-      // First purchase flow: Return device auth info for QR code/push notification
+      // First purchase flow: Return device auth info for widget to display
+      // Data must be at TOP LEVEL of structuredContent for widget to read it
       // NO OAuth challenge here - OAuth is only earned AFTER user approves AND grants delegation
-      // ChatGPT should call show_payment_widget to display the QR code, then poll device_authorize_status
       return {
         content: [
           {
             type: 'text',
-            text: `Payment authorization initiated. Now call show_payment_widget with the payment_data from this response to display the QR code to the user.`,
+            text: `Payment authorization required for ${currency} ${amount.toFixed(2)}. ${notificationSent ? 'A push notification was sent to your WSIM wallet.' : 'Please scan the QR code or use the link to authorize.'}`,
           },
         ],
         structuredContent: {
-          status: 'authorization_initiated',
-          instruction: 'Call show_payment_widget with payment_data to display widget',
-          payment_data: {
-            checkout_session_id: sessionId,
-            amount,
-            currency,
-            merchant_name: merchantName,
-            description: itemNames,
-            authorization_url: authorizationUrl,
-            user_code: deviceAuth.user_code,
-            device_code: deviceAuth.device_code,
-            verification_uri: deviceAuth.verification_uri,
-            qr_code_base64: qrCodeBase64,
-            notification_sent: notificationSent,
-            expires_in: deviceAuth.expires_in,
-          },
+          // Widget reads these fields directly from structuredContent
+          checkout_session_id: sessionId,
+          amount,
+          currency,
+          merchant_name: merchantName,
+          description: itemNames,
+          authorization_url: authorizationUrl,
+          user_code: deviceAuth.user_code,
+          device_code: deviceAuth.device_code,
+          verification_uri: deviceAuth.verification_uri,
+          qr_code_base64: qrCodeBase64,
+          notification_sent: notificationSent,
+          expires_in: deviceAuth.expires_in,
         },
         // NO _meta['mcp/www_authenticate'] here!
         // OAuth challenge is ONLY returned from device_authorize_status when delegation_pending=true
@@ -1587,38 +1584,31 @@ async function executeToolInternal(
       // Generate QR code
       const qrCodeBase64 = await generateQRCodeBase64(authorizationUrl);
 
-      // Build payment data for handoff to show_payment_widget
+      // Return device auth info for widget to display
+      // Data must be at TOP LEVEL of structuredContent for widget to read it
       const notificationSent = deviceAuth.notification_sent === true;
-      const paymentData = {
-        checkout_session_id: sessionId,
-        amount,
-        currency,
-        merchant_name: merchantName,
-        description: itemNames,
-        authorization_url: authorizationUrl,
-        user_code: deviceAuth.user_code,
-        device_code: deviceAuth.device_code,
-        verification_uri: deviceAuth.verification_uri,
-        qr_code_base64: qrCodeBase64,
-        notification_sent: notificationSent,
-        expires_in: deviceAuth.expires_in,
-      };
-
-      // Text instructs AI to call show_payment_widget (two-tool handoff pattern)
-      const textContent = `Payment authorization initiated. Now call show_payment_widget with the payment_data from this response to display the QR code to the user.`;
 
       return {
         content: [
           {
             type: 'text',
-            text: textContent,
+            text: `Payment authorization required for ${currency} ${amount.toFixed(2)}. ${notificationSent ? 'A push notification was sent to your WSIM wallet.' : 'Please scan the QR code or use the link to authorize.'}`,
           },
         ],
-        // structuredContent contains payment_data for AI to pass to show_payment_widget
         structuredContent: {
-          status: 'authorization_initiated',
-          instruction: 'Call show_payment_widget with payment_data to display widget',
-          payment_data: paymentData,
+          // Widget reads these fields directly from structuredContent
+          checkout_session_id: sessionId,
+          amount,
+          currency,
+          merchant_name: merchantName,
+          description: itemNames,
+          authorization_url: authorizationUrl,
+          user_code: deviceAuth.user_code,
+          device_code: deviceAuth.device_code,
+          verification_uri: deviceAuth.verification_uri,
+          qr_code_base64: qrCodeBase64,
+          notification_sent: notificationSent,
+          expires_in: deviceAuth.expires_in,
         },
       };
     }
@@ -1732,37 +1722,30 @@ async function executeToolInternal(
       // Generate QR code
       const qrCodeBase64 = await generateQRCodeBase64(authorizationUrl);
 
-      // Build payment data for handoff to show_payment_widget
+      // Return device auth info for widget to display
+      // Data must be at TOP LEVEL of structuredContent for widget to read it
       const notificationSent = deviceAuth.notification_sent === true;
-      const paymentData = {
-        amount,
-        currency,
-        merchant_name: merchantName,
-        description,
-        authorization_url: authorizationUrl,
-        user_code: deviceAuth.user_code,
-        device_code: deviceAuth.device_code,
-        verification_uri: deviceAuth.verification_uri,
-        qr_code_base64: qrCodeBase64,
-        notification_sent: notificationSent,
-        expires_in: deviceAuth.expires_in,
-      };
-
-      // Text instructs AI to call show_payment_widget (two-tool handoff pattern)
-      const textContent = `Payment authorization initiated. Now call show_payment_widget with the payment_data from this response to display the QR code to the user.`;
 
       return {
         content: [
           {
             type: 'text',
-            text: textContent,
+            text: `Payment authorization required for ${currency} ${amount.toFixed(2)}. ${notificationSent ? 'A push notification was sent to your WSIM wallet.' : 'Please scan the QR code or use the link to authorize.'}`,
           },
         ],
-        // structuredContent contains payment_data for AI to pass to show_payment_widget
         structuredContent: {
-          status: 'authorization_initiated',
-          instruction: 'Call show_payment_widget with payment_data to display widget',
-          payment_data: paymentData,
+          // Widget reads these fields directly from structuredContent
+          amount,
+          currency,
+          merchant_name: merchantName,
+          description,
+          authorization_url: authorizationUrl,
+          user_code: deviceAuth.user_code,
+          device_code: deviceAuth.device_code,
+          verification_uri: deviceAuth.verification_uri,
+          qr_code_base64: qrCodeBase64,
+          notification_sent: notificationSent,
+          expires_in: deviceAuth.expires_in,
         },
       };
     }
@@ -1998,7 +1981,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.33',
+      version: '1.5.34',
       timestamp: new Date().toISOString(),
     })
   );
@@ -2060,7 +2043,7 @@ const httpServer = createServer(async (req, res) => {
 // Start server
 httpServer.listen(PORT, () => {
   log.info('startup', `SACP MCP Apps Server started`, {
-    version: '1.5.33',
+    version: '1.5.34',
     port: PORT,
     mcpEndpoint: `http://localhost:${PORT}/mcp`,
     healthEndpoint: `http://localhost:${PORT}/health`,
