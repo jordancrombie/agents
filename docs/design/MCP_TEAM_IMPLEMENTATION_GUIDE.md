@@ -230,7 +230,69 @@ const checkoutTool = {
 };
 ```
 
-### 2. Checkout Handler Logic
+### 2. Two Checkout Flows: User's Choice
+
+WSIM supports two checkout flows. **This is about user choice and privacy**, not just whether the AI knows the email. Some users prefer to share their email with the AI for convenience; others prefer to only share sensitive information directly with WSIM.
+
+| Flow | When to Use | What Happens | User Experience |
+|------|-------------|--------------|-----------------|
+| **A: Share with AI** | User **chooses** to provide their email to the AI | WSIM finds user, links to pairing code, sends push immediately | User clicks web link → goes directly to auth page (no email prompt) |
+| **B: Share with WSIM only** | User **declines** to share email with AI | WSIM creates pairing code without user link, no push sent | User clicks web link → enters email on WSIM site → push sent |
+
+**⚠️ CRITICAL: This is about user choice, not AI capability**
+
+The AI should:
+1. **Offer** to collect the email for a faster experience
+2. **Clearly explain** the user can decline and enter it on the WSIM website instead
+3. **Respect the user's choice** without pressure
+
+**When to use each flow**:
+
+```typescript
+// Flow A: User chose to share email with AI
+const deviceAuth = await wsimClient.post('/device_authorization', {
+  agent_name: 'SACP Shopping Assistant',
+  buyer_email: 'user@example.com',  // ← User provided this
+  buyer_name: 'John Doe',           // ← Optional
+  request_type: 'first_purchase',
+  payment_context: { ... }
+});
+
+// Flow B: User chose NOT to share email with AI
+const deviceAuth = await wsimClient.post('/device_authorization', {
+  agent_name: 'SACP Shopping Assistant',
+  // buyer_email omitted - user will enter it directly on WSIM site
+  request_type: 'first_purchase',
+  payment_context: { ... }
+});
+```
+
+**AI Assistant Guidance - IMPORTANT**:
+
+Your AI MUST present this as a **choice**, not assume the user wants to share their email:
+
+```
+AI: "Great! To complete your $25.99 purchase, I'll send a payment authorization
+    to your WSIM wallet.
+
+    I can send the notification now if you share your WSIM wallet email with me,
+    or you can enter it directly on the WSIM website if you prefer not to share
+    it here.
+
+    Would you like to:
+    1. Share your email with me for faster checkout
+    2. Enter it on the WSIM website instead"
+
+User Option 1: "My email is user@example.com"
+→ AI uses Flow A with buyer_email
+
+User Option 2: "I'll enter it on the website"
+→ AI uses Flow B without buyer_email
+```
+
+**Privacy Note**: Some users may not want to share their payment-related email with AI assistants. By offering both flows, you respect user privacy preferences while still providing a smooth checkout experience.
+
+### 3. Checkout Handler Logic
 
 ```typescript
 async function handleCheckout(args: CheckoutArgs, authToken?: string): Promise<ToolResult> {
@@ -277,10 +339,11 @@ async function handleCheckout(args: CheckoutArgs, authToken?: string): Promise<T
   // CASE B: NO TOKEN → First purchase, use device auth
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Call WSIM device authorization
-  const deviceAuth = await wsimClient.post('/api/agent/v1/oauth/device_authorization', {
+  // Build device authorization request
+  // Include buyer_email if available (Flow A: Known User) for better UX
+  // Omit it if not available (Flow B: Unknown User) - user enters in web flow
+  const deviceAuthRequest: DeviceAuthRequest = {
     agent_name: 'SACP Shopping Assistant',
-    buyer_email: args.buyer_email,
     request_type: 'first_purchase',
     payment_context: {
       amount: args.amount,
@@ -295,7 +358,20 @@ async function handleCheckout(args: CheckoutArgs, authToken?: string): Promise<T
       monthly: 2000,
       currency: 'CAD'
     }
-  });
+  };
+
+  // IMPORTANT: Include buyer_email if known for better UX
+  // - With buyer_email: WSIM sends push immediately, web flow skips email prompt
+  // - Without buyer_email: No push sent, user enters email in web flow
+  if (args.buyer_email) {
+    deviceAuthRequest.buyer_email = args.buyer_email;
+  }
+  if (args.buyer_name) {
+    deviceAuthRequest.buyer_name = args.buyer_name;
+  }
+
+  // Call WSIM device authorization
+  const deviceAuth = await wsimClient.post('/api/agent/v1/oauth/device_authorization', deviceAuthRequest);
 
   // Show QR code / waiting UI to user
   // Then poll for approval...
@@ -495,8 +571,9 @@ POST https://wsim-auth-dev.banksim.ca/api/agent/v1/oauth/device_authorization
 
 {
   "agent_name": "SACP Shopping Assistant",
-  "buyer_email": "user@example.com",
-  "request_type": "first_purchase",  // or "step_up"
+  "buyer_email": "user@example.com",  // OPTIONAL - include for better UX (see "Two Checkout Flows")
+  "buyer_name": "John Doe",           // OPTIONAL - shown in push notification
+  "request_type": "first_purchase",   // or "step_up"
   "payment_context": {
     "amount": "59.99",
     "currency": "CAD",
@@ -531,9 +608,14 @@ POST https://wsim-auth-dev.banksim.ca/api/agent/v1/oauth/device_authorization
   "verification_uri_complete": "https://wsim-auth-dev.banksim.ca/api/m/device?code=WSIM-ABC123-DEF456",
   "expires_in": 900,
   "interval": 5,
-  "notification_sent": true,
-  "notification_user_id": "user_xxx"
+  "notification_sent": true,      // true if buyer_email was provided and user found
+  "notification_user_id": "user_xxx"  // only present if notification was sent
 }
+```
+
+**Note on `notification_sent`**:
+- `true` → WSIM found the user (via `buyer_email`) and sent a push notification. The web flow will skip email prompt.
+- `false` or absent → No user linked. Web flow will ask for email, then send push.
 ```
 
 ### Poll Response (Approved with Delegation)
@@ -575,6 +657,7 @@ POST https://wsim-auth-dev.banksim.ca/api/agent/v1/oauth/device_authorization
 | **Checkout handler logic** | ⬜ TODO | MCP server checkout tool implementation |
 | **Token validation via JWKS** | ⬜ TODO | MCP server (call WSIM JWKS) |
 | **OAuth challenge return format** | ⬜ TODO | MCP server (when `delegation_pending: true`) |
+| **Support both checkout flows (user's choice)** | ⬜ TODO | AI must offer choice: share email with AI for faster checkout, OR enter on WSIM site for privacy |
 
 ---
 
@@ -586,6 +669,7 @@ POST https://wsim-auth-dev.banksim.ca/api/agent/v1/oauth/device_authorization
 | **0.5** | **Configure connector as "Mixed" in OpenAI Platform** | ⬜ TODO | **YES - Required for no-prompt setup** |
 | 1 | Add `securitySchemes` to tool definitions (`noauth` for browse, mixed for checkout) | ⬜ TODO | No |
 | 2 | Handle checkout WITHOUT token → call WSIM device_authorization | ⬜ TODO | No |
+| **2.5** | **Support both checkout flows (user's choice)** - AI MUST offer user the choice to share email OR enter on WSIM site (see "Two Checkout Flows: User's Choice") | ⬜ TODO | No |
 | 3 | When `delegation_pending: true` → return OAuth challenge with proper format | ⬜ TODO | No |
 | 4 | Handle checkout WITH token → validate via JWKS, check limits | ⬜ TODO | No |
 | 5 | Within limits → auto-approve (no user interaction) | ⬜ TODO | No |

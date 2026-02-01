@@ -1623,6 +1623,7 @@ function inferRequestType(request: AccessRequest): RequestType {
 
 #### Checkout Handler Implementation
 - [ ] **Handle checkout WITHOUT token**: Call WSIM `/device_authorization` with `request_type: 'first_purchase'`
+- [ ] **Support two checkout flows (user's choice)**: AI MUST offer user the choice to share email with AI for faster checkout, OR enter it directly on WSIM site for privacy. Pass `buyer_email` only if user chooses to share.
 - [ ] **Handle checkout WITH token**: Validate via JWKS, check limits
 - [ ] **Within limits**: Auto-approve (no user interaction)
 - [ ] **Over limits**: Call WSIM `/device_authorization` with `request_type: 'step_up'` + `exceeded_limit`
