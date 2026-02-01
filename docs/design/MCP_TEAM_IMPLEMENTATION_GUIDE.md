@@ -1,15 +1,67 @@
 # MCP Team Implementation Guide: Payment-Bootstrapped OAuth
 
-**Date**: 2026-02-01
+**Date**: 2026-02-01 (Updated)
 **From**: WSIM Team
 **To**: Agents/MCP Team
 **Status**: ACTION REQUIRED
 
 ---
 
-## Executive Summary
+## 🚨 TL;DR - EXACTLY WHAT YOU NEED TO DO
 
-OpenAI has confirmed that our Payment-Bootstrapped OAuth design is fully supported. The MCP server needs specific changes to complete the integration. This document provides exact implementation details.
+### Step 1: Add This Endpoint to Your MCP Server (BLOCKING)
+
+Your MCP server at `sacp-mcp.banksim.ca` must serve this endpoint:
+
+```typescript
+// ADD THIS TO YOUR MCP SERVER - NOT WSIM
+app.get('/.well-known/oauth-protected-resource', (req, res) => {
+  res.json({
+    resource: 'https://sacp-mcp.banksim.ca',
+    authorization_servers: ['https://wsim-auth-dev.banksim.ca'],
+    scopes_supported: ['purchase'],
+    bearer_methods_supported: ['header']
+  });
+});
+```
+
+**Test it works:**
+```bash
+curl https://sacp-mcp.banksim.ca/.well-known/oauth-protected-resource
+# Must return JSON, not 404
+```
+
+### Step 2: Configure Connector as "Mixed" in OpenAI Platform
+
+When creating/editing the connector in the OpenAI Apps platform:
+- **Select "Mixed" authentication** (NOT "OAuth Required", NOT "None")
+
+### Step 3: Add `securitySchemes` to Your Tool Definitions
+
+```javascript
+// Browse/search tools - NO auth required
+{ name: 'browse_products', securitySchemes: [{ type: 'noauth' }] }
+{ name: 'search', securitySchemes: [{ type: 'noauth' }] }
+
+// Checkout tool - works with OR without token
+{ name: 'checkout', securitySchemes: [{ type: 'noauth' }, { type: 'oauth2', scopes: ['purchase'] }] }
+```
+
+### Step 4: Implement Checkout Handler Logic
+
+See detailed code below in "Checkout Handler Logic" section.
+
+---
+
+## What This Achieves
+
+| User Action | What Happens |
+|-------------|--------------|
+| Adds connector | No OAuth prompt (Mixed + noauth tools) |
+| Browses products | Works immediately (noauth) |
+| First purchase | Device auth flow (QR/push) - can grant delegation |
+| Second purchase (if delegation granted + within limits) | **Auto-approves, no user interaction** |
+| Over-limit purchase | Step-up auth (device auth with limit warning) |
 
 ---
 
@@ -499,11 +551,39 @@ POST https://wsim-auth-dev.banksim.ca/api/agent/v1/oauth/device_authorization
 
 ---
 
-## Summary: What You Need to Do
+## Who Does What (Responsibility Matrix)
+
+### ✅ WSIM Team (DONE - No Action Needed)
+
+| What | Status | Endpoint |
+|------|--------|----------|
+| OAuth Authorization Server Metadata | ✅ Done | `https://wsim-auth-dev.banksim.ca/.well-known/oauth-authorization-server` |
+| Dynamic Client Registration (RFC 7591) | ✅ Done | `https://wsim-auth-dev.banksim.ca/api/agent/v1/oauth/register` |
+| Device Authorization (RFC 8628) | ✅ Done | `https://wsim-auth-dev.banksim.ca/api/agent/v1/oauth/device_authorization` |
+| Token Endpoint | ✅ Done | `https://wsim-auth-dev.banksim.ca/api/agent/v1/oauth/token` |
+| JWKS for Token Validation | ✅ Done | `https://wsim-auth-dev.banksim.ca/.well-known/jwks.json` |
+| Authorization Endpoint | ✅ Done | `https://wsim-auth-dev.banksim.ca/api/agent/v1/oauth/authorize` |
+| Payment-Bootstrapped OAuth fields | ✅ Done | `delegation_granted`, `delegation_pending` in responses |
+
+### ⬜ MCP Team (ACTION REQUIRED)
+
+| What | Status | Where |
+|------|--------|-------|
+| **`/.well-known/oauth-protected-resource` endpoint** | ⬜ TODO | `https://sacp-mcp.banksim.ca/.well-known/oauth-protected-resource` |
+| **Connector configured as "Mixed" auth** | ⬜ TODO | OpenAI Platform connector settings |
+| **Tool `securitySchemes`** | ⬜ TODO | Tool definitions in MCP server code |
+| **Checkout handler logic** | ⬜ TODO | MCP server checkout tool implementation |
+| **Token validation via JWKS** | ⬜ TODO | MCP server (call WSIM JWKS) |
+| **OAuth challenge return format** | ⬜ TODO | MCP server (when `delegation_pending: true`) |
+
+---
+
+## Summary: What MCP Team Needs to Do
 
 | # | Task | Status | Blocking? |
 |---|------|--------|-----------|
 | **0** | **Add `/.well-known/oauth-protected-resource` endpoint to MCP server** | ⬜ TODO | **YES - Connector creation fails without this** |
+| **0.5** | **Configure connector as "Mixed" in OpenAI Platform** | ⬜ TODO | **YES - Required for no-prompt setup** |
 | 1 | Add `securitySchemes` to tool definitions (`noauth` for browse, mixed for checkout) | ⬜ TODO | No |
 | 2 | Handle checkout WITHOUT token → call WSIM device_authorization | ⬜ TODO | No |
 | 3 | When `delegation_pending: true` → return OAuth challenge with proper format | ⬜ TODO | No |

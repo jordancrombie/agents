@@ -1613,17 +1613,32 @@ function inferRequestType(request: AccessRequest): RequestType {
 ## Action Items
 
 ### MCP Team
-- [ ] **Per-tool securitySchemes** (OpenAI Confirmed): `noauth` for browse/search, mixed for checkout
-- [ ] **OAuth challenge format** (OpenAI Confirmed): MUST include `error` + `error_description` parameters
-- [ ] **isError: true required** (OpenAI Confirmed): Set even when payment succeeds but OAuth linking needed
+
+#### ⚠️ BLOCKING - Must Do First
+- [ ] **Add `/.well-known/oauth-protected-resource` to MCP server** - ChatGPT fetches this from `sacp-mcp.banksim.ca` (NOT WSIM). Without it, connector creation fails with "doesn't support OAuth"
+- [ ] **Configure connector as "Mixed" in OpenAI Platform** - This allows browse without OAuth prompt, triggers OAuth only on challenge
+
+#### Tool Configuration
+- [ ] **Per-tool securitySchemes** (OpenAI Confirmed): `noauth` for browse/search, `[noauth, oauth2]` for checkout
+
+#### Checkout Handler Implementation
+- [ ] **Handle checkout WITHOUT token**: Call WSIM `/device_authorization` with `request_type: 'first_purchase'`
+- [ ] **Handle checkout WITH token**: Validate via JWKS, check limits
+- [ ] **Within limits**: Auto-approve (no user interaction)
+- [ ] **Over limits**: Call WSIM `/device_authorization` with `request_type: 'step_up'` + `exceeded_limit`
+- [ ] **When `delegation_pending: true`**: Return OAuth challenge with `mcp/www_authenticate` header
+
+#### OAuth Challenge Format (OpenAI Confirmed)
+- [ ] **MUST include `error` + `error_description`** in challenge string
+- [ ] **MUST set `isError: true`** even when payment succeeded but OAuth linking needed
 - [ ] **Validate tokens via JWKS**: Use `https://wsim-auth-dev.banksim.ca/.well-known/jwks.json`
+
+#### Other
 - [ ] Enforce limits even when token exists (per-transaction AND daily)
 - [ ] **Cache limits with 5-minute TTL** to reduce latency (see Q2)
-- [ ] **Trigger WSIM step-up when limits exceeded** - pass `request_type: 'step_up'` + `exceeded_limit` to device_authorization (see Q3)
 - [ ] Stop treating "token present" as "skip all authorization"
-- [ ] Return appropriate message to user: "This exceeds your limit. Please approve in your wallet."
-- [ ] **Handle `delegation_pending: true` in poll response** - trigger OAuth challenge via `mcp/www_authenticate` header so ChatGPT initiates OAuth flow (see Q1)
-- [ ] See [MCP Team Implementation Guide](./MCP_TEAM_IMPLEMENTATION_GUIDE.md) for complete code examples
+
+**See [MCP Team Implementation Guide](./MCP_TEAM_IMPLEMENTATION_GUIDE.md) for complete code examples.**
 
 ### WSIM Team (Backend)
 - [ ] Add `payment_context` to AccessRequest model and device auth response
