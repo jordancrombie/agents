@@ -509,25 +509,11 @@ const tools = [
       destructiveHint: false,
       readOnlyHint: false,
     },
-    // Mixed auth: Tool works with OR without OAuth token
-    // - noauth: First purchase (triggers device auth flow)
-    // - oauth2: Delegated purchase (auto-approve within limits, step-up if exceeded)
-    // Must be an array per OpenAI Apps SDK schema validation
-    securitySchemes: [
-      { type: 'noauth' }, // First purchase - no token required
-      {
-        type: 'oauth2',
-        flows: {
-          authorizationCode: {
-            authorizationUrl: `${WSIM_BASE_URL}/api/agent/v1/oauth/authorize`,
-            tokenUrl: `${WSIM_BASE_URL}/api/agent/v1/oauth/token`,
-            scopes: {
-              purchase: 'Make payments on behalf of the user',
-            },
-          },
-        },
-      },
-    ],
+    // NO securitySchemes declared - OAuth is NOT required at setup time!
+    // Per Payment-Bootstrapped OAuth model:
+    // - First purchase: Device auth flow (QR/push)
+    // - If user grants delegation: mcp/www_authenticate triggers OAuth AFTER payment
+    // - Subsequent purchases: MCP validates Bearer token if present, but doesn't require it
   },
 
   // === Individual Checkout Tools (Advanced Use) ===
