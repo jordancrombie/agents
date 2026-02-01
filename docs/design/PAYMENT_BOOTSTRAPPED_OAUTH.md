@@ -3,9 +3,9 @@
 **Unified Purchase, Consent, and Delegation Model for MCP + WSIM**
 
 **Owner**: WSIM Team + mwsim Team + Agents Team (Joint)
-**Date**: 2026-01-31
-**Status**: Design Approved - Implementation Pending
-**Related**: [ChatGPT OAuth Integration Plan](./PROJECT_PLAN_CHATGPT_OAUTH_INTEGRATION.md)
+**Date**: 2026-02-01 (Updated)
+**Status**: Design Approved - OpenAI Requirements Confirmed
+**Related**: [ChatGPT OAuth Integration Plan](./PROJECT_PLAN_CHATGPT_OAUTH_INTEGRATION.md), [MCP Team Implementation Guide](./MCP_TEAM_IMPLEMENTATION_GUIDE.md)
 
 ---
 
@@ -426,23 +426,39 @@ if (request.request_type === 'step_up') {
 
 ### MCP Team Responsibilities
 
-#### 1. Support Mixed Authentication on Checkout
+#### 1. Support Per-Tool Security Schemes (OpenAI Confirmed)
 
-The checkout tool must support BOTH authenticated and unauthenticated calls:
+Use `securitySchemes` on each tool to control authentication requirements:
 
 ```typescript
-// Tool definition with mixed auth
+// Public tools - no auth needed (user can browse without linking)
+{
+  name: 'browse_products',
+  description: 'Browse available products',
+  inputSchema: { ... },
+  securitySchemes: [{ type: 'noauth' }]
+}
+
+{
+  name: 'search',
+  description: 'Search for products',
+  inputSchema: { ... },
+  securitySchemes: [{ type: 'noauth' }]
+}
+
+// Checkout tool - works with OR without OAuth token (mixed auth)
 {
   name: 'checkout',
   description: 'Complete a purchase',
   inputSchema: { ... },
-  // This tool works with OR without OAuth
   securitySchemes: [
     { type: 'noauth' },  // First purchase - no token required
-    { type: 'oauth2', scopes: ['purchase'] }  // Delegated purchase
+    { type: 'oauth2', scopes: ['purchase'] }  // Delegated purchase - with token
   ]
 }
 ```
+
+> **OpenAI Confirmed**: Per-tool `securitySchemes` is fully supported. This allows browse/search to work immediately while checkout handles both first-purchase (no token) and delegated (with token) flows.
 
 #### 2. Checkout Handler Logic
 
@@ -459,12 +475,13 @@ async function handleCheckout(args, authToken) {
 
   if (!validation.valid) {
     // Token expired/invalid - return OAuth challenge
+    // NOTE: error + error_description REQUIRED for ChatGPT to process
     return {
-      isError: true,
+      isError: true,  // ← REQUIRED for ChatGPT to show OAuth UI
       content: [{ type: 'text', text: 'Session expired. Please re-authenticate.' }],
       _meta: {
         'mcp/www_authenticate': [
-          'Bearer resource_metadata="https://wsim.banksim.ca/.well-known/oauth-protected-resource", error="invalid_token"'
+          'Bearer resource_metadata="https://wsim-auth-dev.banksim.ca/.well-known/oauth-protected-resource", error="invalid_token", error_description="Token expired or invalid"'
         ]
       }
     };
@@ -821,6 +838,114 @@ This means:
 
 ---
 
+## OpenAI/ChatGPT Technical Requirements (Confirmed 2026-02-01)
+
+The following requirements have been confirmed directly with the OpenAI team. These are **critical** for the integration to work.
+
+### 1. Per-Tool Security Schemes
+
+OpenAI supports per-tool authentication control. Use `securitySchemes` on tool definitions:
+
+```javascript
+// Public tools - no auth needed
+const browseProductsTool = {
+  name: 'browse_products',
+  description: 'Browse available products',
+  inputSchema: { /* ... */ },
+  securitySchemes: [{ type: 'noauth' }]
+};
+
+// Checkout tool - works WITH or WITHOUT OAuth token
+const checkoutTool = {
+  name: 'checkout',
+  description: 'Complete a purchase',
+  inputSchema: { /* ... */ },
+  securitySchemes: [
+    { type: 'noauth' },  // First purchase - no token
+    { type: 'oauth2', scopes: ['purchase'] }  // Delegated - with token
+  ]
+};
+```
+
+### 2. OAuth Challenge Format (CRITICAL)
+
+The `mcp/www_authenticate` challenge **MUST** include `error` and `error_description` parameters for ChatGPT to recognize and process it:
+
+```javascript
+// ❌ WRONG - ChatGPT ignores this
+'Bearer resource_metadata="https://wsim.banksim.ca/.well-known/oauth-protected-resource"'
+
+// ✅ CORRECT - ChatGPT processes this and shows OAuth UI
+'Bearer resource_metadata="https://wsim-auth-dev.banksim.ca/.well-known/oauth-protected-resource", error="insufficient_scope", error_description="Wallet linking required for automatic payments"'
+```
+
+### 3. isError Flag Required for OAuth Challenge
+
+When returning an OAuth challenge (even after a successful payment), set `isError: true`. This is **required** for ChatGPT to process the `mcp/www_authenticate` header:
+
+```javascript
+// After payment completes, trigger OAuth linking
+return {
+  isError: true,  // ← REQUIRED for ChatGPT to show OAuth UI
+  content: [{
+    type: 'text',
+    text: 'Payment complete! Link your wallet for automatic payments.'
+  }],
+  structuredContent: {
+    status: 'approved',  // ← Payment DID succeed
+    delegation_pending: true
+  },
+  _meta: {
+    'mcp/www_authenticate': [
+      'Bearer resource_metadata="https://wsim-auth-dev.banksim.ca/.well-known/oauth-protected-resource", error="insufficient_scope", error_description="Wallet linking required for automatic payments"'
+    ]
+  }
+};
+```
+
+### 4. Token Auto-Inclusion
+
+After OAuth completes, ChatGPT automatically includes `Authorization: Bearer <token>` on subsequent tool calls. MCP does not need to do anything special - just handle the token when it arrives.
+
+### 5. JWKS Token Validation
+
+MCP should validate tokens via WSIM's JWKS endpoint:
+
+```
+GET https://wsim-auth-dev.banksim.ca/.well-known/jwks.json
+```
+
+Example validation:
+```typescript
+import jwt from 'jsonwebtoken';
+import jwksClient from 'jwks-rsa';
+
+const wsimJwksClient = jwksClient({
+  jwksUri: 'https://wsim-auth-dev.banksim.ca/.well-known/jwks.json',
+  cache: true,
+  cacheMaxAge: 600000, // 10 minutes
+});
+
+async function validateTokenViaJWKS(token: string): Promise<TokenPayload | null> {
+  try {
+    const decoded = jwt.decode(token, { complete: true });
+    if (!decoded || !decoded.header.kid) return null;
+
+    const key = await wsimJwksClient.getSigningKey(decoded.header.kid);
+    const publicKey = key.getPublicKey();
+
+    return jwt.verify(token, publicKey, {
+      algorithms: ['RS256'],
+      issuer: 'https://wsim-auth-dev.banksim.ca'
+    }) as TokenPayload;
+  } catch {
+    return null;
+  }
+}
+```
+
+---
+
 ## Configuration
 
 ### Token Lifetimes
@@ -883,10 +1008,11 @@ MCP receives delegation_pending: true
 MCP returns to ChatGPT:
     {
       "content": [{ "text": "Payment complete! To enable automatic payments, please link your WSIM Wallet." }],
-      "isError": true,
+      "isError": true,  // ← REQUIRED for ChatGPT to process challenge
+      "structuredContent": { "status": "approved", "delegation_pending": true },
       "_meta": {
         "mcp/www_authenticate": [
-          "Bearer resource_metadata=\"https://wsim.banksim.ca/.well-known/oauth-protected-resource\""
+          "Bearer resource_metadata=\"https://wsim-auth-dev.banksim.ca/.well-known/oauth-protected-resource\", error=\"insufficient_scope\", error_description=\"Wallet linking required for automatic payments\""
         ]
       }
     }
@@ -1487,13 +1613,17 @@ function inferRequestType(request: AccessRequest): RequestType {
 ## Action Items
 
 ### MCP Team
-- [ ] Support mixed auth (`noauth` + `oauth2`) on checkout
+- [ ] **Per-tool securitySchemes** (OpenAI Confirmed): `noauth` for browse/search, mixed for checkout
+- [ ] **OAuth challenge format** (OpenAI Confirmed): MUST include `error` + `error_description` parameters
+- [ ] **isError: true required** (OpenAI Confirmed): Set even when payment succeeds but OAuth linking needed
+- [ ] **Validate tokens via JWKS**: Use `https://wsim-auth-dev.banksim.ca/.well-known/jwks.json`
 - [ ] Enforce limits even when token exists (per-transaction AND daily)
 - [ ] **Cache limits with 5-minute TTL** to reduce latency (see Q2)
 - [ ] **Trigger WSIM step-up when limits exceeded** - pass `request_type: 'step_up'` + `exceeded_limit` to device_authorization (see Q3)
 - [ ] Stop treating "token present" as "skip all authorization"
 - [ ] Return appropriate message to user: "This exceeds your limit. Please approve in your wallet."
 - [ ] **Handle `delegation_pending: true` in poll response** - trigger OAuth challenge via `mcp/www_authenticate` header so ChatGPT initiates OAuth flow (see Q1)
+- [ ] See [MCP Team Implementation Guide](./MCP_TEAM_IMPLEMENTATION_GUIDE.md) for complete code examples
 
 ### WSIM Team (Backend)
 - [ ] Add `payment_context` to AccessRequest model and device auth response
