@@ -2011,107 +2011,6 @@ function handleHealth(res: ServerResponse) {
 }
 
 /**
- * Handle OAuth Authorization Server Metadata (RFC 8414)
- * Required for ChatGPT MCP connector setup - it needs to discover RFC 7591 registration
- * We point to WSIM for actual auth but handle registration ourselves (proxy to WSIM)
- */
-function handleOAuthAuthorizationServerMetadata(res: ServerResponse) {
-  const MCP_SERVER_URL = 'https://sacp-mcp.banksim.ca';
-
-  const metadata = {
-    // Issuer is WSIM (they issue the tokens)
-    issuer: WSIM_BASE_URL,
-
-    // Authorization and token endpoints are on WSIM
-    authorization_endpoint: `${WSIM_BASE_URL}/api/agent/v1/oauth/authorize`,
-    token_endpoint: `${WSIM_BASE_URL}/api/agent/v1/oauth/token`,
-    device_authorization_endpoint: `${WSIM_BASE_URL}/api/agent/v1/oauth/device_authorization`,
-
-    // Registration endpoint is on US (we proxy to WSIM)
-    // This satisfies ChatGPT's RFC 7591 requirement
-    registration_endpoint: `${MCP_SERVER_URL}/oauth/register`,
-
-    // JWKS is on WSIM
-    jwks_uri: `${WSIM_BASE_URL}/.well-known/jwks.json`,
-
-    // Supported features
-    grant_types_supported: [
-      'authorization_code',
-      'urn:ietf:params:oauth:grant-type:device_code',
-    ],
-    response_types_supported: ['code'],
-    code_challenge_methods_supported: ['S256'],
-    token_endpoint_auth_methods_supported: ['client_secret_post', 'client_secret_basic', 'none'],
-    scopes_supported: ['browse', 'cart', 'purchase'],
-
-    // Documentation
-    service_documentation: `${MCP_SERVER_URL}/docs`,
-  };
-
-  res.writeHead(200, {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Cache-Control': 'max-age=3600',
-  });
-  res.end(JSON.stringify(metadata, null, 2));
-}
-
-/**
- * Handle RFC 7591 Dynamic Client Registration
- * Proxies to WSIM's registration endpoint
- * This satisfies ChatGPT's requirement for RFC 7591 support
- */
-async function handleOAuthRegister(req: IncomingMessage, res: ServerResponse) {
-  const requestId = generateRequestId();
-
-  // Read request body
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(chunk as Buffer);
-  }
-  const body = Buffer.concat(chunks).toString();
-
-  log.info(requestId, 'RFC 7591 registration request received', {
-    bodyLength: body.length,
-  });
-
-  try {
-    // Proxy to WSIM's registration endpoint
-    const wsimResponse = await fetch(`${WSIM_BASE_URL}/api/agent/v1/oauth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body,
-    });
-
-    const responseBody = await wsimResponse.text();
-
-    log.info(requestId, 'RFC 7591 registration response from WSIM', {
-      status: wsimResponse.status,
-      bodyLength: responseBody.length,
-    });
-
-    // Forward WSIM's response
-    res.writeHead(wsimResponse.status, {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-    });
-    res.end(responseBody);
-  } catch (error) {
-    log.error(requestId, 'RFC 7591 registration proxy error', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-
-    res.writeHead(502, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      error: 'server_error',
-      error_description: 'Failed to proxy registration to authorization server',
-    }));
-  }
-}
-
-/**
  * Handle CORS preflight
  */
 function handleCors(res: ServerResponse) {
@@ -2144,20 +2043,6 @@ const httpServer = createServer(async (req, res) => {
   // Health check
   if (req.method === 'GET' && url.pathname === '/health') {
     handleHealth(res);
-    return;
-  }
-
-  // OAuth Authorization Server Metadata (RFC 8414)
-  // Required for ChatGPT to discover RFC 7591 registration endpoint
-  if (req.method === 'GET' && url.pathname === '/.well-known/oauth-authorization-server') {
-    handleOAuthAuthorizationServerMetadata(res);
-    return;
-  }
-
-  // RFC 7591 Dynamic Client Registration (proxy to WSIM)
-  // Satisfies ChatGPT's requirement for dynamic registration
-  if (req.method === 'POST' && url.pathname === '/oauth/register') {
-    await handleOAuthRegister(req, res);
     return;
   }
 
