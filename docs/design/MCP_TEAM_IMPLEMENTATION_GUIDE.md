@@ -47,7 +47,84 @@ OpenAI has confirmed that our Payment-Bootstrapped OAuth design is fully support
 
 ---
 
+## ⚠️ CRITICAL: OAuth Discovery on MCP Server (BLOCKING ISSUE)
+
+**This is the root cause of the "MCP server does not implement OAuth" error.**
+
+When you configure the connector as "Mixed" auth, ChatGPT validates that OAuth infrastructure exists **at connector setup time**. This validation happens even though users won't be prompted for OAuth until later.
+
+### The Problem
+
+ChatGPT tried to fetch OAuth discovery from your MCP server:
+```
+GET https://sacp-mcp.banksim.ca/.well-known/oauth-protected-resource
+```
+
+This returned 404 → ChatGPT rejected the connector with "does not implement OAuth".
+
+### The Fix
+
+**The MCP server must serve this endpoint** (not WSIM - the MCP server itself):
+
+```
+GET https://sacp-mcp.banksim.ca/.well-known/oauth-protected-resource
+```
+
+Return this JSON:
+```json
+{
+  "resource": "https://sacp-mcp.banksim.ca",
+  "authorization_servers": ["https://wsim-auth-dev.banksim.ca"],
+  "scopes_supported": ["purchase"],
+  "bearer_methods_supported": ["header"],
+  "resource_documentation": "https://docs.banksim.ca/sacp"
+}
+```
+
+### Implementation (Express.js example)
+
+```typescript
+// Add this route to your MCP server
+app.get('/.well-known/oauth-protected-resource', (req, res) => {
+  res.json({
+    resource: 'https://sacp-mcp.banksim.ca',
+    authorization_servers: ['https://wsim-auth-dev.banksim.ca'],
+    scopes_supported: ['purchase'],
+    bearer_methods_supported: ['header'],
+    resource_documentation: 'https://docs.banksim.ca/sacp'
+  });
+});
+```
+
+### Why This Is Needed
+
+| Endpoint | Hosted By | Purpose |
+|----------|-----------|---------|
+| `/.well-known/oauth-protected-resource` | **MCP Server** (sacp-mcp.banksim.ca) | Tells ChatGPT "I'm a protected resource, here's my auth server" |
+| `/.well-known/oauth-authorization-server` | WSIM (wsim-auth-dev.banksim.ca) | OAuth server metadata (authorization, token endpoints) |
+| `/.well-known/jwks.json` | WSIM (wsim-auth-dev.banksim.ca) | Public keys for token validation |
+
+**Key insight**: "Mixed" auth means "some tools need OAuth" - ChatGPT still validates OAuth exists at setup, but won't prompt users until a protected tool returns an OAuth challenge.
+
+### Verification
+
+After adding the endpoint, test it:
+```bash
+curl https://sacp-mcp.banksim.ca/.well-known/oauth-protected-resource
+```
+
+Must return:
+- HTTP 200
+- `Content-Type: application/json`
+- JSON with `resource` and `authorization_servers`
+
+---
+
 ## What MCP Team Needs to Implement
+
+### 0. OAuth Protected Resource Metadata (REQUIRED FIRST)
+
+Add the `/.well-known/oauth-protected-resource` endpoint as described above. **This must be done before the connector can be created.**
 
 ### 1. Tool Security Schemes
 
@@ -406,14 +483,29 @@ POST https://wsim-auth-dev.banksim.ca/api/agent/v1/oauth/device_authorization
 
 ## Summary: What You Need to Do
 
-| # | Task | Status |
-|---|------|--------|
-| 1 | Add `securitySchemes` to tool definitions (`noauth` for browse, mixed for checkout) | ⬜ TODO |
-| 2 | Handle checkout WITHOUT token → call WSIM device_authorization | ⬜ TODO |
-| 3 | When `delegation_pending: true` → return OAuth challenge with proper format | ⬜ TODO |
-| 4 | Handle checkout WITH token → validate via JWKS, check limits | ⬜ TODO |
-| 5 | Within limits → auto-approve (no user interaction) | ⬜ TODO |
-| 6 | Over limits → call WSIM device_authorization with `request_type: 'step_up'` | ⬜ TODO |
+| # | Task | Status | Blocking? |
+|---|------|--------|-----------|
+| **0** | **Add `/.well-known/oauth-protected-resource` endpoint to MCP server** | ⬜ TODO | **YES - Connector creation fails without this** |
+| 1 | Add `securitySchemes` to tool definitions (`noauth` for browse, mixed for checkout) | ⬜ TODO | No |
+| 2 | Handle checkout WITHOUT token → call WSIM device_authorization | ⬜ TODO | No |
+| 3 | When `delegation_pending: true` → return OAuth challenge with proper format | ⬜ TODO | No |
+| 4 | Handle checkout WITH token → validate via JWKS, check limits | ⬜ TODO | No |
+| 5 | Within limits → auto-approve (no user interaction) | ⬜ TODO | No |
+| 6 | Over limits → call WSIM device_authorization with `request_type: 'step_up'` | ⬜ TODO | No |
+
+### Quick Copy-Paste for Task #0
+
+```typescript
+// Add to your MCP server routes
+app.get('/.well-known/oauth-protected-resource', (req, res) => {
+  res.json({
+    resource: 'https://sacp-mcp.banksim.ca',
+    authorization_servers: ['https://wsim-auth-dev.banksim.ca'],
+    scopes_supported: ['purchase'],
+    bearer_methods_supported: ['header']
+  });
+});
+```
 
 ---
 
