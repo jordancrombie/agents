@@ -350,7 +350,7 @@ function extractBearerToken(authHeader: string | undefined): string | null {
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.31';
+const WIDGET_VERSION = '1.5.33';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -804,7 +804,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.31',
+              version: '1.5.33',
             },
           },
         };
@@ -1352,42 +1352,36 @@ async function executeToolInternal(
         expiresIn: deviceAuth.expires_in,
       });
 
-      // Return BOTH:
-      // 1. _meta["mcp/www_authenticate"] - RFC 6750 WWW-Authenticate challenge for ChatGPT OAuth
-      // 2. structuredContent - Device auth data for widget fallback (QR code, push notification)
-      //
-      // If ChatGPT supports MCP OAuth, it will handle the challenge and retry with Bearer token.
-      // Otherwise, the widget displays QR code and polls for device authorization.
+      // First purchase flow: Return device auth info for QR code/push notification
+      // NO OAuth challenge here - OAuth is only earned AFTER user approves AND grants delegation
+      // ChatGPT should call show_payment_widget to display the QR code, then poll device_authorize_status
       return {
         content: [
           {
             type: 'text',
-            text: `Payment authorization required for ${currency} ${amount.toFixed(2)}. ${notificationSent ? 'A notification was sent to your WSIM wallet.' : 'Please authorize to complete this payment.'}`,
+            text: `Payment authorization initiated. Now call show_payment_widget with the payment_data from this response to display the QR code to the user.`,
           },
         ],
-        // Mark as error so ChatGPT knows to handle the auth challenge
-        isError: true,
         structuredContent: {
-          checkout_session_id: sessionId,
-          amount,
-          currency,
-          merchant_name: merchantName,
-          description: itemNames,
-          authorization_url: authorizationUrl,
-          user_code: deviceAuth.user_code,
-          device_code: deviceAuth.device_code,
-          verification_uri: deviceAuth.verification_uri,
-          qr_code_base64: qrCodeBase64,
-          notification_sent: notificationSent,
-          expires_in: deviceAuth.expires_in,
+          status: 'authorization_initiated',
+          instruction: 'Call show_payment_widget with payment_data to display widget',
+          payment_data: {
+            checkout_session_id: sessionId,
+            amount,
+            currency,
+            merchant_name: merchantName,
+            description: itemNames,
+            authorization_url: authorizationUrl,
+            user_code: deviceAuth.user_code,
+            device_code: deviceAuth.device_code,
+            verification_uri: deviceAuth.verification_uri,
+            qr_code_base64: qrCodeBase64,
+            notification_sent: notificationSent,
+            expires_in: deviceAuth.expires_in,
+          },
         },
-        // OAuth challenge for ChatGPT - RFC 6750 WWW-Authenticate format (array of strings)
-        // ChatGPT will see this and initiate OAuth flow to WSIM
-        _meta: {
-          'mcp/www_authenticate': [
-            `Bearer resource_metadata="${WSIM_BASE_URL}/.well-known/oauth-protected-resource", error="insufficient_scope", error_description="Authentication required to complete payment"`,
-          ],
-        },
+        // NO _meta['mcp/www_authenticate'] here!
+        // OAuth challenge is ONLY returned from device_authorize_status when delegation_pending=true
       };
     }
 
@@ -2004,7 +1998,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.31',
+      version: '1.5.33',
       timestamp: new Date().toISOString(),
     })
   );
@@ -2066,7 +2060,7 @@ const httpServer = createServer(async (req, res) => {
 // Start server
 httpServer.listen(PORT, () => {
   log.info('startup', `SACP MCP Apps Server started`, {
-    version: '1.5.31',
+    version: '1.5.33',
     port: PORT,
     mcpEndpoint: `http://localhost:${PORT}/mcp`,
     healthEndpoint: `http://localhost:${PORT}/health`,
