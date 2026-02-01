@@ -350,7 +350,7 @@ function extractBearerToken(authHeader: string | undefined): string | null {
 
 // Widget template configuration
 // Version the URI to bust ChatGPT's cache when widget changes (per OpenAI Apps SDK best practice)
-const WIDGET_VERSION = '1.5.34';
+const WIDGET_VERSION = '1.5.36';
 const WIDGET_URI = `ui://widget/authorization-v${WIDGET_VERSION}.html`;
 const WIDGET_MIME_TYPE = 'text/html+skybridge';
 
@@ -439,6 +439,8 @@ const tools = [
       destructiveHint: false,
       readOnlyHint: true,
     },
+    // OpenAI Confirmed: Per-tool security schemes control auth requirements
+    securitySchemes: [{ type: 'noauth' }], // Public - no auth needed to browse
   },
   {
     name: 'get_product',
@@ -461,6 +463,7 @@ const tools = [
       destructiveHint: false,
       readOnlyHint: true,
     },
+    securitySchemes: [{ type: 'noauth' }], // Public - no auth needed
   },
 
   // === Unified Checkout (Primary - Single Tool) ===
@@ -509,11 +512,14 @@ const tools = [
       destructiveHint: false,
       readOnlyHint: false,
     },
-    // NO securitySchemes declared - OAuth is NOT required at setup time!
+    // OpenAI Confirmed: Mixed auth - works with OR without OAuth token
     // Per Payment-Bootstrapped OAuth model:
-    // - First purchase: Device auth flow (QR/push)
-    // - If user grants delegation: mcp/www_authenticate triggers OAuth AFTER payment
-    // - Subsequent purchases: MCP validates Bearer token if present, but doesn't require it
+    // - First purchase (no token): Device auth flow (QR/push)
+    // - Delegated purchase (with token): Validate token, check limits, auto-approve
+    securitySchemes: [
+      { type: 'noauth' },  // First purchase - no token required
+      { type: 'oauth2', scopes: ['purchase'] },  // Delegated purchase - with token
+    ],
   },
 
   // === Individual Checkout Tools (Advanced Use) ===
@@ -546,6 +552,7 @@ const tools = [
       destructiveHint: false,
       readOnlyHint: false,
     },
+    securitySchemes: [{ type: 'noauth' }], // Cart creation doesn't require auth
   },
   {
     name: 'get_checkout',
@@ -568,6 +575,7 @@ const tools = [
       destructiveHint: false,
       readOnlyHint: true,
     },
+    securitySchemes: [{ type: 'noauth' }], // Reading checkout status doesn't require auth
   },
   {
     name: 'update_checkout',
@@ -602,6 +610,7 @@ const tools = [
       destructiveHint: false,
       readOnlyHint: false,
     },
+    securitySchemes: [{ type: 'noauth' }], // Updating buyer info doesn't require auth
   },
   {
     name: 'complete_checkout',
@@ -624,6 +633,11 @@ const tools = [
       destructiveHint: false,
       readOnlyHint: false,
     },
+    // Mixed auth - like checkout tool, triggers payment
+    securitySchemes: [
+      { type: 'noauth' },  // First purchase
+      { type: 'oauth2', scopes: ['purchase'] },  // Delegated
+    ],
   },
   {
     name: 'cancel_checkout',
@@ -646,6 +660,7 @@ const tools = [
       destructiveHint: true,
       readOnlyHint: false,
     },
+    securitySchemes: [{ type: 'noauth' }], // Cancel doesn't require auth (session-based)
   },
   {
     name: 'get_order_status',
@@ -668,6 +683,7 @@ const tools = [
       destructiveHint: false,
       readOnlyHint: true,
     },
+    securitySchemes: [{ type: 'noauth' }], // Order lookup doesn't require auth
   },
 
   // === Device Authorization (Payment) ===
@@ -710,6 +726,7 @@ const tools = [
       destructiveHint: false,
       readOnlyHint: false,
     },
+    securitySchemes: [{ type: 'noauth' }], // Device auth initiation doesn't require prior auth
   },
   {
     name: 'device_authorize_status',
@@ -735,6 +752,7 @@ const tools = [
       destructiveHint: false,
       readOnlyHint: true,
     },
+    securitySchemes: [{ type: 'noauth' }], // Status polling doesn't require auth
   },
 
 ];
@@ -804,7 +822,7 @@ async function handleMcpRequest(
             },
             serverInfo: {
               name: 'sacp-mcp-apps',
-              version: '1.5.34',
+              version: '1.5.36',
             },
           },
         };
@@ -1843,8 +1861,9 @@ async function executeToolInternal(
           },
           _meta: {
             // Trigger OAuth challenge - ChatGPT will initiate OAuth flow
+            // CRITICAL: error + error_description REQUIRED for ChatGPT to process challenge
             'mcp/www_authenticate': [
-              `Bearer resource_metadata="${WSIM_BASE_URL}/.well-known/oauth-protected-resource"`,
+              `Bearer resource_metadata="${WSIM_BASE_URL}/.well-known/oauth-protected-resource", error="insufficient_scope", error_description="Wallet linking required for automatic payments"`,
             ],
           },
         };
@@ -1981,7 +2000,7 @@ function handleHealth(res: ServerResponse) {
     JSON.stringify({
       status: 'healthy',
       service: 'sacp-mcp-apps',
-      version: '1.5.34',
+      version: '1.5.36',
       timestamp: new Date().toISOString(),
     })
   );
@@ -1998,6 +2017,28 @@ function handleCors(res: ServerResponse) {
     'Access-Control-Max-Age': '86400',
   });
   res.end();
+}
+
+/**
+ * Handle OAuth Protected Resource Metadata
+ * Required for ChatGPT to validate OAuth infrastructure at connector setup time.
+ * See: https://datatracker.ietf.org/doc/html/rfc9470
+ */
+function handleOAuthProtectedResource(req: IncomingMessage, res: ServerResponse) {
+  // Derive resource URL from request host (works for both localhost and production)
+  const host = req.headers.host || 'sacp-mcp.banksim.ca';
+  const protocol = host.includes('localhost') ? 'http' : 'https';
+
+  res.writeHead(200, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+  });
+  res.end(JSON.stringify({
+    resource: `${protocol}://${host}`,
+    authorization_servers: [WSIM_BASE_URL],
+    scopes_supported: ['purchase'],
+    bearer_methods_supported: ['header'],
+  }));
 }
 
 // Create HTTP server
@@ -2023,6 +2064,12 @@ const httpServer = createServer(async (req, res) => {
     return;
   }
 
+  // OAuth Protected Resource Metadata (required for ChatGPT Mixed auth)
+  if (req.method === 'GET' && url.pathname === '/.well-known/oauth-protected-resource') {
+    handleOAuthProtectedResource(req, res);
+    return;
+  }
+
   // SSE connection
   if (req.method === 'GET' && url.pathname === '/mcp') {
     handleSseRequest(res);
@@ -2043,7 +2090,7 @@ const httpServer = createServer(async (req, res) => {
 // Start server
 httpServer.listen(PORT, () => {
   log.info('startup', `SACP MCP Apps Server started`, {
-    version: '1.5.34',
+    version: '1.5.36',
     port: PORT,
     mcpEndpoint: `http://localhost:${PORT}/mcp`,
     healthEndpoint: `http://localhost:${PORT}/health`,

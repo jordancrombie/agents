@@ -5,6 +5,36 @@ All notable changes to the SACP MCP Server & HTTP Gateway will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.36] - 2026-02-01
+
+### Added
+- **OAuth Protected Resource Metadata Endpoint**: Required for ChatGPT "Mixed" auth connector setup
+  - `GET /.well-known/oauth-protected-resource` endpoint
+  - Returns `resource`, `authorization_servers`, `scopes_supported`, `bearer_methods_supported`
+  - Dynamically derives resource URL from request host (works for localhost and production)
+  - Fixes "MCP server does not implement OAuth" error during connector creation
+
+## [1.5.35] - 2026-02-01
+
+### Added
+- **Per-Tool Security Schemes**: OpenAI-confirmed feature for controlling auth per tool
+  - `browse_products`, `get_product`: `securitySchemes: [{ type: 'noauth' }]` (public)
+  - `checkout`, `complete_checkout`: Mixed auth with `noauth` + `oauth2` (Payment-Bootstrapped OAuth)
+  - All other tools: `noauth` (device auth handles authorization)
+
+### Fixed
+- **OAuth Challenge Format**: ChatGPT requires `error` + `error_description` parameters
+  - Fixed `mcp/www_authenticate` header in `device_authorize_status` delegation flow
+  - Added: `error="insufficient_scope", error_description="Wallet linking required for automatic payments"`
+  - Without these params, ChatGPT ignores the OAuth challenge
+
+### Changed
+- **Payment-Bootstrapped OAuth Model**: Full implementation per design doc
+  - First purchase: Device auth (QR/push) - no OAuth required upfront
+  - User can grant delegation during first purchase
+  - If delegation granted: `delegation_pending: true` triggers OAuth linking
+  - Subsequent purchases: Auto-approve within limits, step-up for over-limit
+
 ## [1.5.7] - 2026-01-29
 
 ### Fixed
